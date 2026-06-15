@@ -185,6 +185,9 @@
     box-shadow:var(--sombra);border:1px solid var(--gris-cl)}
   .filtros summary{font-weight:700;cursor:pointer;font-size:14px;color:var(--campo);outline:none}
   .filtros[open] summary{margin-bottom:12px}
+  .aviso-filtro{background:#fff7e0;border:1px solid var(--trigo);border-radius:10px;
+    padding:9px 13px;margin-bottom:12px;font-size:13.5px;color:var(--tinta)}
+  .aviso-filtro a{color:var(--campo);font-weight:700;margin-left:4px}
 
   /* ---------- AUTOCOMPLETE ---------- */
   .autobox{position:relative}
@@ -297,6 +300,21 @@
     <section class="vista" id="v-dashboard">
       <h2 class="sec">Resumen financiero</h2>
       <p class="sub">Una foto del estado del negocio para decidir con números a la vista.</p>
+
+      <details class="filtros" style="margin-bottom:14px">
+        <summary>🔍 Filtros</summary>
+        <div class="campo-form"><label>Mes</label><select id="fd-mes"><option value="">Todos los meses</option></select></div>
+        <div class="fila2">
+          <div class="campo-form"><label>Desde</label><input type="date" id="fd-desde"></div>
+          <div class="campo-form"><label>Hasta</label><input type="date" id="fd-hasta"></div>
+        </div>
+        <div class="campo-form"><label>Empleado</label><select id="fd-emp"><option value="">Todos</option></select></div>
+        <div class="fila2">
+          <button class="btn peq linea" onclick="render()">Aplicar</button>
+          <button class="btn peq gris" onclick="limpiarFiltros('dash')">Limpiar</button>
+        </div>
+      </details>
+
       <div id="dash-kpis" class="totales" style="grid-template-columns:repeat(4,1fr)"></div>
       <div id="dash-sugerencias"></div>
       <div class="tarjeta">
@@ -370,6 +388,24 @@
       <h2 class="sec">Cuenta por empleado</h2>
       <p class="sub">Cada pestaña reúne las labores (lo que ganó) y los pagos (lo entregado).</p>
       <div class="pestanas" id="pestanas"></div>
+
+      <details class="filtros" style="margin-top:14px">
+        <summary>🔍 Filtros</summary>
+        <div class="fila2">
+          <div class="campo-form"><label>Desde</label><input type="date" id="fc-desde"></div>
+          <div class="campo-form"><label>Hasta</label><input type="date" id="fc-hasta"></div>
+        </div>
+        <div class="fila2">
+          <div class="campo-form"><label>Tipo</label><select id="fc-tipo"><option value="">Labores y pagos</option><option value="labor">Solo labores (lo que ganó)</option><option value="pago">Solo pagos (lo entregado)</option></select></div>
+          <div class="campo-form"><label>Campo / Actividad</label><select id="fc-act"><option value="">Todos</option></select></div>
+        </div>
+        <div class="campo-form"><label>Buscar texto (campo / actividad / observaciones)</label><input id="fc-txt" placeholder="Ej: La Elisa"></div>
+        <div class="fila2">
+          <button class="btn peq linea" onclick="render()">Aplicar</button>
+          <button class="btn peq gris" onclick="limpiarFiltros('cuenta')">Limpiar</button>
+        </div>
+      </details>
+
       <div class="totales" id="totales-emp"></div>
       <button class="btn linea" id="btn-imprimir" onclick="imprimirResumen()" style="margin-bottom:14px">🖨️ Imprimir / Guardar PDF del resumen</button>
       <div id="lista-cuenta"></div>
@@ -744,17 +780,41 @@ function llenarSelectEmpleados(sel,incluirVacio){
 }
 function llenarFiltros(){
   // empleados
-  [$('fl-emp'),$('fp-emp')].forEach(s=>{const v=s.value;llenarSelectEmpleados(s,true);s.value=v;});
+  [$('fl-emp'),$('fp-emp'),$('fd-emp')].forEach(s=>{if(!s)return;const v=s.value;llenarSelectEmpleados(s,true);s.value=v;});
   // actividades
   const acts=valoresUsados('actividades');
   $('fl-act').innerHTML='<option value="">Todas</option>'+acts.map(a=>`<option>${a}</option>`).join('');
   // categorias
   const cats=valoresUsados('categorias');
   $('fp-cat').innerHTML='<option value="">Todas</option>'+cats.map(c=>`<option>${c}</option>`).join('');
+  // por empleado: campos + actividades combinados
+  if($('fc-act')){
+    const campos=[...new Set(Object.values(labores).map(l=>l.campo).filter(Boolean))].sort();
+    const v=$('fc-act').value;
+    $('fc-act').innerHTML='<option value="">Todos</option>'
+      +(acts.length?'<optgroup label="Actividades">'+acts.map(a=>`<option value="act:${a}">${a}</option>`).join('')+'</optgroup>':'')
+      +(campos.length?'<optgroup label="Campos">'+campos.map(c=>`<option value="campo:${c}">${c}</option>`).join('')+'</optgroup>':'');
+    $('fc-act').value=v;
+  }
+  // dashboard: meses
+  if($('fd-mes')){
+    const meses=[...new Set([...Object.values(labores).map(l=>(l.fecha||'').slice(0,7)),...Object.values(pagos).map(p=>(p.fecha||'').slice(0,7))].filter(Boolean))].sort().reverse();
+    const v=$('fd-mes').value;
+    $('fd-mes').innerHTML='<option value="">Todos los meses</option>'+meses.map(m=>`<option value="${m}">${nombreMes(m)}</option>`).join('');
+    $('fd-mes').value=v;
+  }
+}
+function nombreMes(ym){
+  if(!ym)return '';
+  const[a,m]=ym.split('-');
+  const N=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return (N[parseInt(m)]||m)+' '+a;
 }
 function limpiarFiltros(t){
   if(t==='labor'){['fl-desde','fl-hasta','fl-txt'].forEach(i=>$(i).value='');$('fl-act').value='';$('fl-emp').value='';}
-  else{['fp-desde','fp-hasta','fp-txt'].forEach(i=>$(i).value='');$('fp-cat').value='';$('fp-emp').value='';}
+  else if(t==='pago'){['fp-desde','fp-hasta','fp-txt'].forEach(i=>$(i).value='');$('fp-cat').value='';$('fp-emp').value='';}
+  else if(t==='cuenta'){['fc-desde','fc-hasta','fc-txt'].forEach(i=>$(i).value='');$('fc-tipo').value='';$('fc-act').value='';}
+  else if(t==='dash'){['fd-desde','fd-hasta'].forEach(i=>$(i).value='');$('fd-mes').value='';$('fd-emp').value='';}
   render();
 }
 function entreFechas(f,d,h){if(d&&f<d)return false;if(h&&f>h)return false;return true;}
@@ -773,6 +833,15 @@ function render(){
 
 /* =================== DASHBOARD =================== */
 function renderDashboard(){
+  // ----- filtros -----
+  const fmes=$('fd-mes')?$('fd-mes').value:'';
+  let fdd=$('fd-desde')?$('fd-desde').value:'';
+  let fhh=$('fd-hasta')?$('fd-hasta').value:'';
+  const femp=$('fd-emp')?$('fd-emp').value:'';
+  // si hay mes elegido, acota el rango a ese mes (y manda sobre desde/hasta)
+  if(fmes){ fdd=fmes+'-01'; fhh=fmes+'-31'; }
+  const pasaFecha=f=>entreFechas((f||'').slice(0,10),fdd,fhh);
+
   // ----- agregados -----
   let facturacion=0;      // precio*has de cada labor = lo que cobra la empresa
   let correspondeEmp=0;   // suma de importes que van a empleados (su %)
@@ -780,20 +849,27 @@ function renderDashboard(){
   const porEmp={}, porAct={}, porMes={};
 
   Object.values(labores).forEach(l=>{
+    if(!pasaFecha(l.fecha))return;
+    const parts=(l.participantes||[]).filter(p=>!femp||p.emp===femp);
+    if(femp && !parts.length)return; // esta labor no involucra al empleado filtrado
     const tot=(l.precio||0)*(l.has||0);
-    facturacion+=tot; totalHas+=(l.has||0);
+    // si filtro por empleado, la "facturación" mostrada es la porción de ese empleado
+    const aporte = femp ? parts.reduce((s,p)=>s+(p.importe||0),0) : tot;
+    facturacion+=aporte; totalHas+=(l.has||0);
     porAct[l.act]=porAct[l.act]||{importe:0,has:0,veces:0};
-    porAct[l.act].importe+=tot; porAct[l.act].has+=(l.has||0); porAct[l.act].veces++;
+    porAct[l.act].importe+=aporte; porAct[l.act].has+=(l.has||0); porAct[l.act].veces++;
     const mes=(l.fecha||'').slice(0,7);
     porMes[mes]=porMes[mes]||{fact:0,pag:0};
-    porMes[mes].fact+=tot;
-    (l.participantes||[]).forEach(p=>{
+    porMes[mes].fact+=aporte;
+    parts.forEach(p=>{
       correspondeEmp+=p.importe;
       porEmp[p.emp]=porEmp[p.emp]||{gana:0,paga:0};
       porEmp[p.emp].gana+=p.importe;
     });
   });
   Object.values(pagos).forEach(p=>{
+    if(!pasaFecha(p.fecha))return;
+    if(femp && p.emp!==femp)return;
     totalPagado+=(p.monto||0);
     porEmp[p.emp]=porEmp[p.emp]||{gana:0,paga:0};
     porEmp[p.emp].paga+=(p.monto||0);
@@ -806,12 +882,31 @@ function renderDashboard(){
   const precioMedioHa=totalHas?facturacion/totalHas:0;
   const pctManoObra=facturacion?(correspondeEmp/facturacion*100):0;
 
+  // aviso de filtro activo
+  const filtrando = femp || fmes || fdd || fhh;
+  let avisoFiltro='';
+  if(filtrando){
+    const partes=[];
+    if(femp) partes.push('empleado: '+(empleados[femp]?empleados[femp].nombre:'—'));
+    if(fmes) partes.push(nombreMes(fmes));
+    else if(fdd||fhh) partes.push((fdd?fechaLinda(fdd):'inicio')+' a '+(fhh?fechaLinda(fhh):'hoy'));
+    avisoFiltro=`<div class="aviso-filtro">📌 Mostrando solo: ${partes.join(' · ')}. <a href="#" onclick="limpiarFiltros('dash');return false;">Ver todo</a></div>`;
+  }
+
   // ----- KPIs -----
+  const etFact = femp ? 'Le corresponde' : 'Facturado (labores)';
+  const cardMargen = femp
+    ? `<div class="total-card"><div class="et">Margen empresa</div><div class="num" style="color:var(--tinta);opacity:.35">—</div></div>`
+    : `<div class="total-card gana"><div class="et">Margen empresa</div><div class="num" style="color:var(--verde-ok)">${plata(margenEmpresa)}</div></div>`;
   $('dash-kpis').innerHTML=`
-    <div class="total-card"><div class="et">Facturado (labores)</div><div class="num">${plata(facturacion)}</div></div>
-    <div class="total-card gana"><div class="et">Margen empresa</div><div class="num" style="color:var(--verde-ok)">${plata(margenEmpresa)}</div></div>
+    <div class="total-card"><div class="et">${etFact}</div><div class="num">${plata(facturacion)}</div></div>
+    ${cardMargen}
     <div class="total-card paga"><div class="et">Total abonado</div><div class="num" style="color:var(--rojo)">${plata(totalPagado)}</div></div>
     <div class="total-card saldo"><div class="et">Saldo a empleados</div><div class="num">${plata(saldoEmpleados)}</div></div>`;
+  $('dash-kpis').insertAdjacentHTML('beforebegin','');
+  // colocar aviso justo antes de los KPIs (limpio el anterior si existe)
+  const viejo=document.getElementById('aviso-filtro-dash'); if(viejo)viejo.remove();
+  if(avisoFiltro){ $('dash-kpis').insertAdjacentHTML('beforebegin',`<div id="aviso-filtro-dash">${avisoFiltro}</div>`); }
 
   // ----- SUGERENCIAS -----
   const sug=[];
@@ -1079,23 +1174,46 @@ function renderCuenta(){
   let regs=[];
   let gana=0, paga=0;
   const filtroEmp=empSeleccionado;
+  // filtros del panel
+  const fd=$('fc-desde')?$('fc-desde').value:'';
+  const fh=$('fc-hasta')?$('fc-hasta').value:'';
+  const ftipo=$('fc-tipo')?$('fc-tipo').value:'';
+  const fact=$('fc-act')?$('fc-act').value:'';
+  const ftxt=($('fc-txt')?$('fc-txt').value:'').trim().toLowerCase();
+  const matchAct=(l)=>{
+    if(!fact)return true;
+    if(fact.startsWith('act:'))return l.act===fact.slice(4);
+    if(fact.startsWith('campo:'))return (l.campo||'')===fact.slice(6);
+    return true;
+  };
 
-  Object.entries(labores).forEach(([id,l])=>{
-    (l.participantes||[]).forEach(p=>{
+  if(ftipo!=='pago'){
+    Object.entries(labores).forEach(([id,l])=>{
+      if(!entreFechas(l.fecha,fd,fh))return;
+      if(!matchAct(l))return;
+      if(ftxt && !((l.campo||'')+' '+(l.act||'')).toLowerCase().includes(ftxt))return;
+      (l.participantes||[]).forEach(p=>{
+        if(filtroEmp==='__todos__'||p.emp===filtroEmp){
+          regs.push({tipo:'labor',fecha:l.fecha,emp:p.emp,titulo:l.act,
+            meta:`🌾 ${l.campo||'—'} · ${l.has} ha · ${p.pct}%`,monto:p.importe,id});
+          gana+=p.importe;
+        }
+      });
+    });
+  }
+  if(ftipo!=='labor'){
+    Object.entries(pagos).forEach(([id,p])=>{
+      if(!entreFechas(p.fecha,fd,fh))return;
+      // si hay filtro de campo/actividad, los pagos no aplican salvo que no haya filtro
+      if(fact)return;
+      if(ftxt && !((p.cat||'')+' '+(p.obs||'')).toLowerCase().includes(ftxt))return;
       if(filtroEmp==='__todos__'||p.emp===filtroEmp){
-        regs.push({tipo:'labor',fecha:l.fecha,emp:p.emp,titulo:l.act,
-          meta:`🌾 ${l.campo||'—'} · ${l.has} ha · ${p.pct}%`,monto:p.importe,id});
-        gana+=p.importe;
+        regs.push({tipo:'pago',fecha:p.fecha,emp:p.emp,titulo:p.cat,
+          meta:p.obs?`📝 ${p.obs}`:'',monto:p.monto,id});
+        paga+=p.monto;
       }
     });
-  });
-  Object.entries(pagos).forEach(([id,p])=>{
-    if(filtroEmp==='__todos__'||p.emp===filtroEmp){
-      regs.push({tipo:'pago',fecha:p.fecha,emp:p.emp,titulo:p.cat,
-        meta:p.obs?`📝 ${p.obs}`:'',monto:p.monto,id});
-      paga+=p.monto;
-    }
-  });
+  }
   regs.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
 
   const saldo=gana-paga;

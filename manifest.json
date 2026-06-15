@@ -1,0 +1,17 @@
+{
+  "name": "Empleados - El Mestizo",
+  "short_name": "Empleados",
+  "description": "Gestión de empleados, labores y pagos de servicios agrícolas",
+  "start_url": "empleados.html",
+  "display": "standalone",
+  "background_color": "#1a2e1a",
+  "theme_color": "#1a2e1a",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

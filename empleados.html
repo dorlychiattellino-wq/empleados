@@ -188,6 +188,21 @@
   .aviso-filtro{background:#fff7e0;border:1px solid var(--trigo);border-radius:10px;
     padding:9px 13px;margin-bottom:12px;font-size:13.5px;color:var(--tinta)}
   .aviso-filtro a{color:var(--campo);font-weight:700;margin-left:4px}
+  /* ---------- ITEMS SERVICIO GANADERO ---------- */
+  .item-gan{display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+    background:#fff;border:1px solid var(--gris-cl);border-radius:10px;padding:8px;margin-bottom:7px}
+  .item-gan .sel-signo{width:88px;padding:9px 6px;border:1px solid var(--gris-cl);border-radius:9px;
+    font-size:13.5px;font-family:var(--body);background:#fff;color:var(--tinta)}
+  .item-gan .monto-gan{width:110px;padding:9px;border:1px solid var(--gris-cl);border-radius:9px;
+    font-size:14px;font-family:var(--body);text-align:right}
+  .item-gan .quitar-item{background:none;border:none;cursor:pointer;font-size:16px;padding:4px}
+  .item-gan .autobox input{width:100%}
+  @media(max-width:560px){
+    .item-gan .autobox{flex:1 1 100%!important}
+    .item-gan .monto-gan{flex:1}
+  }
+  .et-gan{background:#e7f0fa;color:#1c4c7c}
+  .registro.gan{border-left-color:#3f7cb4}
 
   /* ---------- AUTOCOMPLETE ---------- */
   .autobox{position:relative}
@@ -336,6 +351,8 @@
       <h2 class="sec">Trabajos agrícolas</h2>
       <p class="sub">Cargá una labor y el importe se reparte solo entre los empleados según su porcentaje.</p>
       <button class="btn" onclick="abrirModalLabor()">+ Cargar labor</button>
+      <div style="height:9px"></div>
+      <button class="btn sec" onclick="abrirModalGan()">🐄 + Cargar servicio ganadero</button>
 
       <details class="filtros" style="margin-top:14px">
         <summary>🔍 Filtros</summary>
@@ -523,14 +540,43 @@
   </div>
 </div>
 
+<!-- ===== MODAL SERVICIO GANADERO ===== -->
+<div class="modal-bg" id="modal-gan">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-gan-titulo">Nuevo servicio ganadero</h3>
+      <button class="modal-cerrar" onclick="cerrar('modal-gan')">×</button>
+    </div>
+    <input type="hidden" id="gan-id">
+    <div class="fila2">
+      <div class="campo-form"><label>Mes que corresponde</label><input type="month" id="gan-mes"></div>
+      <div class="campo-form"><label>Empleado</label><select id="gan-emp"></select></div>
+    </div>
+    <div class="campo-form">
+      <label>Detalle de la liquidación</label>
+      <p class="sub" style="margin:-4px 0 8px">Cargá cada concepto. Elegí <b>Suma</b> para lo que se le paga y <b>Resta</b> para adelantos o descuentos.</p>
+      <div id="gan-items"></div>
+      <button class="btn peq linea" style="margin-top:8px" onclick="agregarItem()">+ Agregar ítem</button>
+    </div>
+    <div class="tarjeta" id="gan-preview" style="background:#f0f6ee;border-color:var(--campo-claro)">
+      <div style="font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase">Total de la liquidación</div>
+      <div id="gan-preview-body" style="margin-top:6px;font-size:14px"></div>
+    </div>
+    <div class="campo-form"><label>Observaciones</label><textarea id="gan-obs" placeholder="Opcional"></textarea></div>
+    <button class="btn" onclick="guardarGan()">Guardar servicio ganadero</button>
+    <button class="btn-cancelar" onclick="cerrar('modal-gan')">Cancelar</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 /* =================== ESTADO =================== */
 let db=null, firebaseOK=false;
-let empleados={}, pagos={}, labores={};
+let empleados={}, pagos={}, labores={}, ganaderos={};
 let empSeleccionado='__todos__';
 let editLaborChips={};
+let editItems=[];
 
 /* =================== UTILES =================== */
 const $=id=>document.getElementById(id);
@@ -595,6 +641,7 @@ function escucharDatos(){
   db.ref('empleados').on('value',s=>{empleados=s.val()||{};render();mostrar();});
   db.ref('pagos').on('value',s=>{pagos=s.val()||{};render();mostrar();});
   db.ref('labores').on('value',s=>{labores=s.val()||{};render();mostrar();});
+  db.ref('ganaderos').on('value',s=>{ganaderos=s.val()||{};render();mostrar();});
   setTimeout(mostrar,4000);
 }
 
@@ -747,6 +794,79 @@ function guardarLabor(){
 }
 function borrarLabor(id){if(confirm('¿Eliminar esta labor?')){borrarRegistro('labores/'+id,'Labor eliminada');}}
 
+/* =================== SERVICIO GANADERO =================== */
+const ITEMS_GAN_BASE=['Servicio','Alquiler','Mercadería','Bonificación anual','Aguinaldo','Adelanto','Descuento'];
+
+function mesActual(){return new Date().toISOString().slice(0,7);}
+
+function abrirModalGan(id){
+  $('gan-id').value=id||'';
+  llenarSelectEmpleados($('gan-emp'),false);
+  const g=id?ganaderos[id]:null;
+  if(g){
+    $('modal-gan-titulo').textContent='Editar servicio ganadero';
+    $('gan-mes').value=g.mes; $('gan-emp').value=g.emp; $('gan-obs').value=g.obs||'';
+    editItems=(g.items||[]).map(i=>({desc:i.desc,monto:i.monto,signo:i.signo}));
+  }else{
+    $('modal-gan-titulo').textContent='Nuevo servicio ganadero';
+    $('gan-mes').value=mesActual(); $('gan-obs').value='';
+    editItems=[{desc:'Servicio',monto:'',signo:1}];
+  }
+  renderItems();
+  abrir('modal-gan');
+}
+function agregarItem(){ editItems.push({desc:'',monto:'',signo:1}); renderItems(); }
+function quitarItem(i){ editItems.splice(i,1); if(!editItems.length)editItems.push({desc:'',monto:'',signo:1}); renderItems(); }
+function cambiarItem(i,campo,v){
+  if(campo==='monto') editItems[i].monto=v;
+  else if(campo==='signo') editItems[i].signo=parseInt(v);
+  else editItems[i].desc=v;
+  previewGan();
+}
+function renderItems(){
+  const cont=$('gan-items');
+  cont.innerHTML=editItems.map((it,i)=>`
+    <div class="item-gan">
+      <div class="campo-form autobox" style="margin:0;flex:1 1 46%">
+        <input id="gi-desc-${i}" autocomplete="off" placeholder="Ej: Servicio, Alquiler..." value="${(it.desc||'').replace(/"/g,'&quot;')}"
+          oninput="cambiarItem(${i},'desc',this.value);autocompletar(this,'itemsgan')" onfocus="autocompletar(this,'itemsgan')">
+        <div class="sugerencias"></div>
+      </div>
+      <select class="sel-signo" onchange="cambiarItem(${i},'signo',this.value)">
+        <option value="1" ${it.signo!==-1?'selected':''}>Suma</option>
+        <option value="-1" ${it.signo===-1?'selected':''}>Resta</option>
+      </select>
+      <input type="number" class="monto-gan" step="0.01" placeholder="0" value="${it.monto}" oninput="cambiarItem(${i},'monto',this.value)">
+      <button class="quitar-item" onclick="quitarItem(${i})" title="Quitar">🗑️</button>
+    </div>`).join('');
+  previewGan();
+}
+function totalGan(items){
+  return (items||[]).reduce((s,i)=>s+((parseFloat(i.monto)||0)*(i.signo===-1?-1:1)),0);
+}
+function previewGan(){
+  const t=totalGan(editItems);
+  const suma=editItems.filter(i=>i.signo!==-1).reduce((s,i)=>s+(parseFloat(i.monto)||0),0);
+  const resta=editItems.filter(i=>i.signo===-1).reduce((s,i)=>s+(parseFloat(i.monto)||0),0);
+  $('gan-preview-body').innerHTML=
+    `<div style="display:flex;justify-content:space-between;padding:2px 0"><span>Suman</span><b style="color:var(--verde-ok)">${plata(suma)}</b></div>`+
+    (resta?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span>Restan</span><b style="color:var(--rojo)">− ${plata(resta)}</b></div>`:'')+
+    `<div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:5px;border-top:1px solid var(--gris-cl);font-size:16px"><span><b>Total a cobrar</b></span><b>${plata(t)}</b></div>`;
+}
+function guardarGan(){
+  const mes=$('gan-mes').value, emp=$('gan-emp').value;
+  if(!mes){toast('Elegí el mes que corresponde');return;}
+  if(!emp){toast('Elegí el empleado');return;}
+  const items=editItems
+    .filter(i=>(i.desc||'').trim() && (parseFloat(i.monto)||0)!==0)
+    .map(i=>({desc:capitalizar(i.desc),monto:parseFloat(i.monto)||0,signo:i.signo===-1?-1:1}));
+  if(!items.length){toast('Cargá al menos un ítem con importe');return;}
+  const id=$('gan-id').value||uid();
+  guardar('ganaderos/'+id,{mes,emp,items,total:totalGan(items),obs:$('gan-obs').value.trim()},'Servicio ganadero guardado');
+  cerrar('modal-gan');
+}
+function borrarGan(id){if(confirm('¿Eliminar este servicio ganadero?')){borrarRegistro('ganaderos/'+id,'Servicio ganadero eliminado');}}
+
 /* =================== AUTOCOMPLETE =================== */
 function capitalizar(s){ s=(s||'').trim(); return s? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 
@@ -760,6 +880,10 @@ function valoresUsados(tipo){
     ACTIVIDADES_BASE.forEach(a=>set.add(a));
     Object.values(labores).forEach(l=>l.act&&set.add(l.act));
   }
+  if(tipo==='itemsgan'){
+    ITEMS_GAN_BASE.forEach(a=>set.add(a));
+    Object.values(ganaderos).forEach(g=>(g.items||[]).forEach(i=>i.desc&&set.add(i.desc)));
+  }
   return [...set].sort();
 }
 function autocompletar(input,tipo){
@@ -770,7 +894,13 @@ function autocompletar(input,tipo){
   box.innerHTML=lista.map(v=>`<div onmousedown="elegirSug(this,'${input.id}')">${v}</div>`).join('');
   box.style.display='block';
 }
-function elegirSug(div,inputId){$(inputId).value=div.textContent;div.parentElement.style.display='none';}
+function elegirSug(div,inputId){
+  const inp=$(inputId);
+  inp.value=div.textContent;
+  div.parentElement.style.display='none';
+  const m=inputId.match(/^gi-desc-(\d+)$/);
+  if(m) cambiarItem(parseInt(m[1]),'desc',inp.value);
+}
 
 /* =================== SELECTS / FILTROS =================== */
 function llenarSelectEmpleados(sel,incluirVacio){
@@ -877,6 +1007,18 @@ function renderDashboard(){
     porMes[mes]=porMes[mes]||{fact:0,pag:0};
     porMes[mes].pag+=(p.monto||0);
   });
+  // servicios ganaderos: es lo que le corresponde al empleado por contrato
+  let totalGanadero=0;
+  Object.values(ganaderos).forEach(g=>{
+    if(!pasaFecha((g.mes||'')+'-15'))return;
+    if(femp && g.emp!==femp)return;
+    const t=g.total||0;
+    totalGanadero+=t;
+    correspondeEmp+=t;
+    if(femp) facturacion+=t;   // al mirar un solo empleado, "le corresponde" incluye lo ganadero
+    porEmp[g.emp]=porEmp[g.emp]||{gana:0,paga:0};
+    porEmp[g.emp].gana+=t;
+  });
   const margenEmpresa=facturacion-correspondeEmp;   // lo que le queda a la empresa
   const saldoEmpleados=correspondeEmp-totalPagado;  // lo que realmente se les debe
   const precioMedioHa=totalHas?facturacion/totalHas:0;
@@ -945,6 +1087,11 @@ function renderDashboard(){
       txt:`Llevás ${plata(instrum)} en instrumentos personales, un costo no salarial. Seguilo aparte al medir el costo real de cada empleado.`});
   }
 
+  if(totalGanadero>0){
+    sug.push({t:'',ico:'🐄',titulo:'Contratos ganaderos',
+      txt:`Las liquidaciones ganaderas suman <b>${plata(totalGanadero)}</b> en el período. Es un costo fijo mensual: tenelo presente al planificar la caja, porque no depende de las hectáreas trabajadas.`});
+  }
+
   $('dash-sugerencias').innerHTML=`<div style="margin-bottom:16px">`+sug.map(s=>`
     <div class="sugerencia ${s.t}">
       <div class="sico">${s.ico}</div>
@@ -993,7 +1140,38 @@ function renderLabores(){
     if(txt&&!((l.campo||'')+' '+(l.act||'')).toLowerCase().includes(txt))return false;
     return true;
   }).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
-  if(!arr.length){cont.innerHTML=vacio('🚜','No hay labores cargadas');return;}
+
+  // servicios ganaderos (se filtran por mes dentro del rango, empleado y texto)
+  let gans=Object.entries(ganaderos).filter(([id,g])=>{
+    const fRef=(g.mes||'')+'-15'; // punto medio del mes para comparar con el rango
+    if(!entreFechas(fRef,d,h))return false;
+    if(act)return false;                       // si filtra por actividad agrícola, no aplica
+    if(emp&&g.emp!==emp)return false;
+    if(txt&&!((g.items||[]).map(i=>i.desc).join(' ')+' '+(g.obs||'')).toLowerCase().includes(txt))return false;
+    return true;
+  }).sort((a,b)=>(b[1].mes||'').localeCompare(a[1].mes||''));
+
+  if(!arr.length&&!gans.length){cont.innerHTML=vacio('🚜','No hay labores cargadas');return;}
+
+  const htmlGan=gans.map(([id,g])=>{
+    const e=empleados[g.emp];
+    const det=(g.items||[]).map(i=>`${i.desc}: ${i.signo===-1?'− ':''}${plata(i.monto)}`).join(' · ');
+    return `<div class="registro gan">
+      <div class="reg-info">
+        <div class="reg-top"><span class="etiqueta et-gan">Ganadero</span><span class="reg-titulo">${nombreMes(g.mes)}</span></div>
+        <div class="reg-meta">🐄 ${e?e.nombre:'—'}${g.obs?' · 📝 '+g.obs:''}</div>
+        <div class="reg-obs">${det}</div>
+        <div class="reg-acc">
+          <button class="icono-btn" onclick="abrirModalGan('${id}')">✏️</button>
+          <button class="icono-btn" onclick="imprimirGanMes('${id}')" title="PDF del mes">🖨️</button>
+          <button class="icono-btn" onclick="borrarGan('${id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="reg-monto">${plata(g.total||0)}</div>
+    </div>`;
+  }).join('');
+
+  if(!arr.length){cont.innerHTML=htmlGan;return;}
   cont.innerHTML=arr.map(([id,l])=>{
     const totalLabor=l.precio*l.has;
     const nombres=(l.participantes||[]).map(p=>{
@@ -1011,7 +1189,7 @@ function renderLabores(){
       </div>
       <div class="reg-monto">${plata(totalLabor)}</div>
     </div>`;
-  }).join('');
+  }).join('')+htmlGan;
 }
 
 function renderPagos(){
@@ -1103,18 +1281,29 @@ function imprimirResumen(){
       paga+=p.monto;
     }
   });
+  Object.values(ganaderos).forEach(g=>{
+    if(filtroEmp==='__todos__'||g.emp===filtroEmp){
+      const det=(g.items||[]).map(i=>`${i.desc}: ${i.signo===-1?'− ':''}${plata(i.monto)}`).join(' · ');
+      regs.push({tipo:'gan',fecha:(g.mes||'')+'-28',emp:g.emp,
+        titulo:'Servicio ganadero — '+nombreMes(g.mes),detalle:det,monto:g.total||0});
+      gana+=(g.total||0);
+    }
+  });
   regs.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   const saldo=gana-paga;
   const titulo = filtroEmp==='__todos__' ? 'Todos los empleados' : (empleados[filtroEmp]?empleados[filtroEmp].nombre:'—');
 
   const filas=regs.map(r=>{
     const e=empleados[r.emp];
-    const esLabor=r.tipo==='labor';
+    const esGan=r.tipo==='gan';
+    const entra=r.tipo==='labor'||esGan;
+    const tipoTxt=esGan?'Ganadero':(entra?'Labor':'Pago');
+    const fechaTxt=esGan?nombreMes((r.fecha||'').slice(0,7)):fechaLinda(r.fecha);
     return `<tr>
-      <td>${fechaLinda(r.fecha)}</td>
-      <td>${esLabor?'Labor':'Pago'}</td>
+      <td>${fechaTxt}</td>
+      <td>${tipoTxt}</td>
       <td>${r.titulo}${filtroEmp==='__todos__'?' — '+(e?e.nombre:'—'):''}${r.detalle?'<br><span class="det">'+r.detalle+'</span>':''}</td>
-      <td class="der ${esLabor?'verde':'rojo'}">${esLabor?'+':'−'}${plata(r.monto)}</td>
+      <td class="der ${entra?'verde':'rojo'}">${entra?'+':'−'}${plata(r.monto)}</td>
     </tr>`;
   }).join('');
 
@@ -1168,6 +1357,99 @@ function imprimirResumen(){
   w.document.write(html); w.document.close();
 }
 
+/* PDF de la liquidación ganadera de un mes */
+function imprimirGanMes(id){
+  const g=ganaderos[id]; if(!g){toast('No se encontró el servicio');return;}
+  const e=empleados[g.emp];
+  const nombre=e?e.nombre:'—';
+  const suma=(g.items||[]).filter(i=>i.signo!==-1).reduce((s,i)=>s+(i.monto||0),0);
+  const resta=(g.items||[]).filter(i=>i.signo===-1).reduce((s,i)=>s+(i.monto||0),0);
+
+  const filas=(g.items||[]).map(i=>`<tr>
+      <td>${i.desc}</td>
+      <td>${i.signo===-1?'Descuento':'Haber'}</td>
+      <td class="der ${i.signo===-1?'rojo':'verde'}">${i.signo===-1?'− ':''}${plata(i.monto)}</td>
+    </tr>`).join('');
+
+  // pagos del mismo mes para ese empleado (comprobantes de transferencia)
+  const pagosMes=Object.values(pagos).filter(p=>p.emp===g.emp&&(p.fecha||'').slice(0,7)===g.mes)
+    .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  const totalPagosMes=pagosMes.reduce((s,p)=>s+(p.monto||0),0);
+  const filasPagos=pagosMes.map(p=>`<tr>
+      <td>${fechaLinda(p.fecha)}</td>
+      <td>${p.cat||'—'}${p.obs?'<br><span class="det">'+p.obs+'</span>':''}</td>
+      <td class="der rojo">${plata(p.monto)}</td>
+    </tr>`).join('');
+
+  const f=new Date();
+  const fechaImp=fechaLinda(hoy())+' '+('0'+f.getHours()).slice(-2)+':'+('0'+f.getMinutes()).slice(-2);
+  const saldoMes=(g.total||0)-totalPagosMes;
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Liquidación ${nombreMes(g.mes)} — ${nombre}</title>
+  <style>
+    *{box-sizing:border-box;font-family:Georgia,'Times New Roman',serif}
+    body{margin:0;padding:32px;color:#1f261c}
+    .cab{display:flex;align-items:center;gap:14px;border-bottom:3px solid #2f5d34;padding-bottom:14px;margin-bottom:8px}
+    .cab img{height:60px}
+    .cab h1{margin:0;font-size:26px;color:#1a2e1a}
+    .cab .sub{margin:2px 0 0;font-size:13px;color:#6b7268;font-family:Arial,sans-serif}
+    .meta{font-family:Arial,sans-serif;font-size:12px;color:#6b7268;margin-bottom:18px}
+    .meta b{color:#1f261c}
+    .tot{display:flex;gap:12px;margin-bottom:20px}
+    .tot div{flex:1;border:1px solid #e4e2d6;border-radius:10px;padding:12px;text-align:center}
+    .tot .et{font-family:Arial,sans-serif;font-size:11px;text-transform:uppercase;color:#6b7268;letter-spacing:.5px}
+    .tot .num{font-size:19px;font-weight:bold;margin-top:4px}
+    .verde{color:#3a8a4a}.rojo{color:#b23a3a}
+    h2{font-size:15px;margin:22px 0 8px;color:#1a2e1a}
+    table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px}
+    th{background:#2f5d34;color:#fff;text-align:left;padding:8px 10px;font-weight:bold}
+    th.der,td.der{text-align:right}
+    td{padding:7px 10px;border-bottom:1px solid #e4e2d6;vertical-align:top}
+    .det{color:#6b7268;font-size:11px}
+    tr:nth-child(even) td{background:#faf9f4}
+    tfoot td{font-weight:bold;background:#f0f6ee!important;font-size:14px}
+    .obs{font-family:Arial,sans-serif;font-size:12px;color:#6b7268;margin-top:12px;
+      background:#faf9f4;border-left:3px solid #d9b44a;padding:9px 12px}
+    .pie{margin-top:24px;font-family:Arial,sans-serif;font-size:11px;color:#9a9a8e;text-align:center;border-top:1px solid #e4e2d6;padding-top:10px}
+    .firma{margin-top:48px;display:flex;justify-content:space-between;font-family:Arial,sans-serif;font-size:12px}
+    .firma div{width:45%;border-top:1px solid #1f261c;padding-top:6px;text-align:center;color:#6b7268}
+    @media print{body{padding:18px}}
+  </style></head><body>
+    <div class="cab"><img src="${LOGO_PDF}"><div><h1>El Mestizo</h1><p class="sub">Liquidación mensual — Contrato ganadero</p></div></div>
+    <div class="meta">Empleado: <b>${nombre}</b> &nbsp;·&nbsp; Período: <b>${nombreMes(g.mes)}</b> &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
+    <div class="tot">
+      <div><div class="et">Total liquidado</div><div class="num verde">${plata(g.total||0)}</div></div>
+      <div><div class="et">Abonado en el mes</div><div class="num rojo">${plata(totalPagosMes)}</div></div>
+      <div><div class="et">Saldo</div><div class="num">${plata(saldoMes)}</div></div>
+    </div>
+
+    <h2>Detalle de la liquidación</h2>
+    <table>
+      <thead><tr><th>Concepto</th><th>Tipo</th><th class="der">Importe</th></tr></thead>
+      <tbody>${filas||'<tr><td colspan=3 style="text-align:center;color:#9a9a8e;padding:20px">Sin ítems</td></tr>'}</tbody>
+      <tfoot>
+        <tr><td colspan=2>Total de haberes</td><td class="der verde">${plata(suma)}</td></tr>
+        ${resta?`<tr><td colspan=2>Total de descuentos</td><td class="der rojo">− ${plata(resta)}</td></tr>`:''}
+        <tr><td colspan=2>TOTAL A COBRAR</td><td class="der">${plata(g.total||0)}</td></tr>
+      </tfoot>
+    </table>
+
+    <h2>Pagos registrados de ${nombreMes(g.mes)}</h2>
+    <table>
+      <thead><tr><th>Fecha</th><th>Comprobante / Detalle</th><th class="der">Importe</th></tr></thead>
+      <tbody>${filasPagos||'<tr><td colspan=3 style="text-align:center;color:#9a9a8e;padding:20px">Sin pagos registrados en este mes</td></tr>'}</tbody>
+    </table>
+    ${g.obs?`<div class="obs"><b>Observaciones:</b> ${g.obs}</div>`:''}
+    <div class="firma"><div>Firma empleado</div><div>Firma empleador</div></div>
+    <div class="pie">Documento generado por la app Empleados — El Mestizo · ${fechaImp}</div>
+    <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank');
+  if(!w){toast('Permití las ventanas emergentes para imprimir');return;}
+  w.document.write(html); w.document.close();
+}
+
 function renderCuenta(){
   const cont=$('lista-cuenta'), totBox=$('totales-emp');
   // armar registros unificados
@@ -1200,6 +1482,18 @@ function renderCuenta(){
         }
       });
     });
+    // servicios ganaderos: también son "lo que ganó"
+    Object.entries(ganaderos).forEach(([id,g])=>{
+      if(fact)return;                            // no aplica filtro de campo/actividad agrícola
+      if(!entreFechas((g.mes||'')+'-15',fd,fh))return;
+      if(ftxt && !((g.items||[]).map(i=>i.desc).join(' ')+' '+(g.obs||'')).toLowerCase().includes(ftxt))return;
+      if(filtroEmp==='__todos__'||g.emp===filtroEmp){
+        const det=(g.items||[]).map(i=>`${i.desc} ${i.signo===-1?'−':''}${plata(i.monto)}`).join(' · ');
+        regs.push({tipo:'gan',fecha:(g.mes||'')+'-28',emp:g.emp,titulo:'Servicio ganadero · '+nombreMes(g.mes),
+          meta:det,monto:g.total||0,id});
+        gana+=(g.total||0);
+      }
+    });
   }
   if(ftipo!=='labor'){
     Object.entries(pagos).forEach(([id,p])=>{
@@ -1218,23 +1512,27 @@ function renderCuenta(){
 
   const saldo=gana-paga;
   totBox.innerHTML=`
-    <div class="total-card gana"><div class="et">Le corresponde (labores)</div><div class="num" style="color:var(--verde-ok)">${plata(gana)}</div></div>
+    <div class="total-card gana"><div class="et">Le corresponde</div><div class="num" style="color:var(--verde-ok)">${plata(gana)}</div></div>
     <div class="total-card paga"><div class="et">Pagado</div><div class="num" style="color:var(--rojo)">${plata(paga)}</div></div>
     <div class="total-card saldo"><div class="et">Saldo a favor</div><div class="num">${plata(saldo)}</div></div>`;
 
   if(!regs.length){cont.innerHTML=vacio('📋','Sin movimientos para esta vista');return;}
   cont.innerHTML=regs.map(r=>{
     const e=empleados[r.emp];
-    const esLabor=r.tipo==='labor';
+    const esGan=r.tipo==='gan';
+    const entra=r.tipo==='labor'||esGan;
+    const clase=esGan?'et-gan':(entra?'et-labor':'et-pago');
+    const etiq=esGan?'Ganadero':(entra?'Ganó':'Pago');
+    const fechaTxt=esGan?nombreMes((r.fecha||'').slice(0,7)):fechaLinda(r.fecha);
     return `<div class="registro ${r.tipo}">
       <div class="reg-info">
         <div class="reg-top">
-          <span class="etiqueta ${esLabor?'et-labor':'et-pago'}">${esLabor?'Ganó':'Pago'}</span>
+          <span class="etiqueta ${clase}">${etiq}</span>
           <span class="reg-titulo">${r.titulo}</span>
         </div>
-        <div class="reg-meta">📅 ${fechaLinda(r.fecha)}${filtroEmp==='__todos__'?' · 👤 '+(e?e.nombre:'—'):''}${r.meta?' · '+r.meta:''}</div>
+        <div class="reg-meta">📅 ${fechaTxt}${filtroEmp==='__todos__'?' · 👤 '+(e?e.nombre:'—'):''}${r.meta?' · '+r.meta:''}</div>
       </div>
-      <div class="reg-monto ${esLabor?'entra':'sale'}">${esLabor?'+':'−'}${plata(r.monto)}</div>
+      <div class="reg-monto ${entra?'entra':'sale'}">${entra?'+':'−'}${plata(r.monto)}</div>
     </div>`;
   }).join('');
 }
@@ -1249,7 +1547,7 @@ function exportarBackup(){
     _app:'Empleados - El Mestizo',
     _version:1,
     _fecha:new Date().toISOString(),
-    empleados, pagos, labores
+    empleados, pagos, labores, ganaderos
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -1269,12 +1567,13 @@ function importarBackup(input){
   reader.onload=e=>{
     try{
       const data=JSON.parse(e.target.result);
-      if(!data.empleados&&!data.pagos&&!data.labores){toast('El archivo no parece un backup válido');return;}
+      if(!data.empleados&&!data.pagos&&!data.labores&&!data.ganaderos){toast('El archivo no parece un backup válido');return;}
       backupPendiente=data;
       const ne=Object.keys(data.empleados||{}).length;
       const np=Object.keys(data.pagos||{}).length;
       const nl=Object.keys(data.labores||{}).length;
-      $('restaurar-info').textContent=`El archivo contiene ${ne} empleados, ${np} pagos y ${nl} labores`+(data._fecha?` (backup del ${fechaLinda(data._fecha.slice(0,10))})`:'')+'.';
+      const ng=Object.keys(data.ganaderos||{}).length;
+      $('restaurar-info').textContent=`El archivo contiene ${ne} empleados, ${np} pagos, ${nl} labores y ${ng} servicios ganaderos`+(data._fecha?` (backup del ${fechaLinda(data._fecha.slice(0,10))})`:'')+'.';
       abrir('modal-restaurar');
     }catch(err){toast('No pude leer el archivo. ¿Es un backup .json?');}
   };
@@ -1290,13 +1589,14 @@ function confirmarRestaurar(modo){
     Promise.all([
       db.ref('empleados').set(b.empleados||{}),
       db.ref('pagos').set(b.pagos||{}),
-      db.ref('labores').set(b.labores||{})
+      db.ref('labores').set(b.labores||{}),
+      db.ref('ganaderos').set(b.ganaderos||{})
     ]).then(()=>toast('Datos reemplazados desde el backup'))
       .catch(()=>toast('Error al restaurar'));
   }else{ // combinar: solo IDs que no existen, sin pisar lo actual
     const updates={};
     let agregados=0;
-    [['empleados',empleados],['pagos',pagos],['labores',labores]].forEach(([col,dest])=>{
+    [['empleados',empleados],['pagos',pagos],['labores',labores],['ganaderos',ganaderos]].forEach(([col,dest])=>{
       Object.entries(b[col]||{}).forEach(([id,val])=>{
         if(!(id in dest)){updates[col+'/'+id]=val;agregados++;}
       });

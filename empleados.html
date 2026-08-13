@@ -473,6 +473,7 @@
     </div>
     <input type="hidden" id="emp-id">
     <div class="campo-form"><label>Nombre</label><input id="emp-nombre" placeholder="Ej: Casco"></div>
+    <div class="campo-form"><label>CUIT / CUIL</label><input id="emp-cuit" placeholder="Ej: 20-12345678-3" maxlength="13"></div>
     <div class="campo-form"><label>Porcentaje fijo (%)</label><input type="number" id="emp-pct" step="0.01" placeholder="Ej: 8"></div>
     <div class="campo-form"><label>Estado</label>
       <select id="emp-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo (se fue)</option></select>
@@ -676,17 +677,18 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.querySelec
 function abrirModalEmp(id){
   $('emp-id').value=id||'';
   if(id){const e=empleados[id];$('modal-emp-titulo').textContent='Editar empleado';
-    $('emp-nombre').value=e.nombre;$('emp-pct').value=e.pct;$('emp-estado').value=e.estado||'activo';}
-  else{$('modal-emp-titulo').textContent='Nuevo empleado';$('emp-nombre').value='';$('emp-pct').value='';$('emp-estado').value='activo';}
+    $('emp-nombre').value=e.nombre;$('emp-cuit').value=e.cuit||'';$('emp-pct').value=e.pct;$('emp-estado').value=e.estado||'activo';}
+  else{$('modal-emp-titulo').textContent='Nuevo empleado';$('emp-nombre').value='';$('emp-cuit').value='';$('emp-pct').value='';$('emp-estado').value='activo';}
   abrir('modal-emp');
 }
 function guardarEmp(){
   const nombre=$('emp-nombre').value.trim();
+  const cuit=$('emp-cuit').value.trim();
   const pct=parseFloat($('emp-pct').value)||0;
   if(!nombre){toast('Poné un nombre');return;}
   const id=$('emp-id').value||uid();
   const orden=$('emp-id').value?(empleados[id].orden||Date.now()):Date.now();
-  guardar('empleados/'+id,{nombre,pct,estado:$('emp-estado').value,orden},'Empleado guardado');
+  guardar('empleados/'+id,{nombre,cuit,pct,estado:$('emp-estado').value,orden},'Empleado guardado');
   cerrar('modal-emp');
 }
 function toggleEstado(id){
@@ -1233,7 +1235,7 @@ function renderEmpleados(){
     return `<div class="emp-item ${ina?'inact':''}">
       <div>
         <div class="emp-nombre">${e.nombre} ${ina?'<span class="emp-pct">· se fue</span>':''}</div>
-        <div class="emp-pct">Porcentaje fijo</div>
+        <div class="emp-pct">${e.cuit?'CUIT/CUIL: '+e.cuit:'Porcentaje fijo'}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span class="badge-pct">${e.pct||0}%</span>
@@ -1337,7 +1339,7 @@ function imprimirResumen(){
     @media print{body{padding:18px}}
   </style></head><body>
     <div class="cab"><img src="${LOGO_PDF}"><div><h1>El Mestizo</h1><p class="sub">Resumen de cuenta — Servicios agrícolas</p></div></div>
-    <div class="meta">Empleado: <b>${titulo}</b> &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
+    <div class="meta">Empleado: <b>${titulo}</b>${filtroEmp!=='__todos__'&&empleados[filtroEmp]&&empleados[filtroEmp].cuit?' &nbsp;·&nbsp; CUIT/CUIL: <b>'+empleados[filtroEmp].cuit+'</b>':''} &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
     <div class="tot">
       <div><div class="et">Le corresponde</div><div class="num verde">${plata(gana)}</div></div>
       <div><div class="et">Pagado</div><div class="num rojo">${plata(paga)}</div></div>
@@ -1416,7 +1418,7 @@ function imprimirGanMes(id){
     @media print{body{padding:18px}}
   </style></head><body>
     <div class="cab"><img src="${LOGO_PDF}"><div><h1>El Mestizo</h1><p class="sub">Liquidación mensual — Contrato ganadero</p></div></div>
-    <div class="meta">Empleado: <b>${nombre}</b> &nbsp;·&nbsp; Período: <b>${nombreMes(g.mes)}</b> &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
+    <div class="meta">Empleado: <b>${nombre}</b>${e&&e.cuit?' &nbsp;·&nbsp; CUIT/CUIL: <b>'+e.cuit+'</b>':''} &nbsp;·&nbsp; Período: <b>${nombreMes(g.mes)}</b> &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
     <div class="tot">
       <div><div class="et">Total liquidado</div><div class="num verde">${plata(g.total||0)}</div></div>
       <div><div class="et">Abonado en el mes</div><div class="num rojo">${plata(totalPagosMes)}</div></div>

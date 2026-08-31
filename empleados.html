@@ -305,9 +305,9 @@
   <nav class="principal">
     <button class="activo" data-vista="labores" onclick="irVista('labores',this)">🚜 Labores</button>
     <button data-vista="pagos" onclick="irVista('pagos',this)">💵 Pagos</button>
-    <button data-vista="cuentas" onclick="irVista('cuentas',this)">👥 Por empleado</button>
+    <button data-vista="cuentas" onclick="irVista('cuentas',this)">👥 Por trabajador</button>
     <button data-vista="dashboard" onclick="irVista('dashboard',this)">📊 Resumen</button>
-    <button data-vista="empleados" onclick="irVista('empleados',this)">⚙️ Empleados</button>
+    <button data-vista="empleados" onclick="irVista('empleados',this)">⚙️ Trabajadores</button>
   </nav>
 
   <main>
@@ -323,7 +323,7 @@
           <div class="campo-form"><label>Desde</label><input type="date" id="fd-desde"></div>
           <div class="campo-form"><label>Hasta</label><input type="date" id="fd-hasta"></div>
         </div>
-        <div class="campo-form"><label>Empleado</label><select id="fd-emp"><option value="">Todos</option></select></div>
+        <div class="campo-form"><label>Trabajador</label><select id="fd-emp"><option value="">Todos</option></select></div>
         <div class="fila2">
           <button class="btn peq linea" onclick="render()">Aplicar</button>
           <button class="btn peq gris" onclick="limpiarFiltros('dash')">Limpiar</button>
@@ -333,7 +333,7 @@
       <div id="dash-kpis" class="totales" style="grid-template-columns:repeat(4,1fr)"></div>
       <div id="dash-sugerencias"></div>
       <div class="tarjeta">
-        <h3 style="font-family:var(--display);margin:0 0 10px;font-size:17px">Saldo con cada empleado</h3>
+        <h3 style="font-family:var(--display);margin:0 0 10px;font-size:17px">Saldo con cada trabajador</h3>
         <div id="dash-saldos"></div>
       </div>
       <div class="tarjeta">
@@ -349,7 +349,7 @@
     <!-- ====== VISTA LABORES ====== -->
     <section class="vista activa" id="v-labores">
       <h2 class="sec">Trabajos agrícolas</h2>
-      <p class="sub">Cargá una labor y el importe se reparte solo entre los empleados según su porcentaje.</p>
+      <p class="sub">Cargá una labor y el importe se reparte solo entre los trabajadores según su porcentaje.</p>
       <button class="btn" onclick="abrirModalLabor()">+ Cargar labor</button>
       <div style="height:9px"></div>
       <button class="btn sec" onclick="abrirModalGan()">🐄 + Cargar servicio ganadero</button>
@@ -362,7 +362,7 @@
         </div>
         <div class="fila2">
           <div class="campo-form"><label>Actividad</label><select id="fl-act"><option value="">Todas</option></select></div>
-          <div class="campo-form"><label>Empleado</label><select id="fl-emp"><option value="">Todos</option></select></div>
+          <div class="campo-form"><label>Trabajador</label><select id="fl-emp"><option value="">Todos</option></select></div>
         </div>
         <div class="campo-form"><label>Buscar texto (campo / observaciones)</label><input id="fl-txt" placeholder="Ej: La Esperanza"></div>
         <div class="fila2">
@@ -377,7 +377,7 @@
     <!-- ====== VISTA PAGOS ====== -->
     <section class="vista" id="v-pagos">
       <h2 class="sec">Pagos y entregas</h2>
-      <p class="sub">Sueldos, instrumentos personales y otros pagos hechos a cada empleado.</p>
+      <p class="sub">Sueldos, instrumentos personales y otros pagos hechos a cada trabajador.</p>
       <button class="btn sec" onclick="abrirModalPago()">+ Cargar pago</button>
 
       <details class="filtros" style="margin-top:14px">
@@ -388,7 +388,7 @@
         </div>
         <div class="fila2">
           <div class="campo-form"><label>Categoría</label><select id="fp-cat"><option value="">Todas</option></select></div>
-          <div class="campo-form"><label>Empleado</label><select id="fp-emp"><option value="">Todos</option></select></div>
+          <div class="campo-form"><label>Trabajador</label><select id="fp-emp"><option value="">Todos</option></select></div>
         </div>
         <div class="campo-form"><label>Buscar texto (descripción / observaciones)</label><input id="fp-txt" placeholder="Ej: botas"></div>
         <div class="fila2">
@@ -402,7 +402,7 @@
 
     <!-- ====== VISTA POR EMPLEADO (pestañas) ====== -->
     <section class="vista" id="v-cuentas">
-      <h2 class="sec">Cuenta por empleado</h2>
+      <h2 class="sec">Cuenta por trabajador</h2>
       <p class="sub">Cada pestaña reúne las labores (lo que ganó) y los pagos (lo entregado).</p>
       <div class="pestanas" id="pestanas"></div>
 
@@ -430,14 +430,14 @@
 
     <!-- ====== VISTA EMPLEADOS ====== -->
     <section class="vista" id="v-empleados">
-      <h2 class="sec">Empleados</h2>
-      <p class="sub">Cada empleado tiene un porcentaje fijo (editable) que se usa al repartir las labores.</p>
-      <button class="btn" onclick="abrirModalEmp()">+ Agregar empleado</button>
+      <h2 class="sec">Trabajadores</h2>
+      <p class="sub">Cada trabajador tiene un porcentaje fijo (editable) que se usa al repartir las labores.</p>
+      <button class="btn" onclick="abrirModalEmp()">+ Agregar trabajador</button>
       <div id="lista-empleados" style="margin-top:14px"></div>
 
       <div class="tarjeta" style="margin-top:22px;border-top:3px solid var(--tierra)">
         <h3 style="font-family:var(--display);margin:0 0 4px;font-size:17px">💾 Copia de seguridad</h3>
-        <p class="sub" style="margin-bottom:14px">Guardá un respaldo de todos los datos (empleados, pagos y labores) o restauralo desde un archivo.</p>
+        <p class="sub" style="margin-bottom:14px">Guardá un respaldo de todos los datos (trabajadores, pagos y labores) o restauralo desde un archivo.</p>
         <button class="btn" onclick="exportarBackup()">⬇️ Descargar backup (.json)</button>
         <div style="height:10px"></div>
         <button class="btn sec" onclick="document.getElementById('archivo-backup').click()">⬆️ Restaurar desde archivo</button>
@@ -468,7 +468,7 @@
 <div class="modal-bg" id="modal-emp">
   <div class="modal">
     <div class="modal-head">
-      <h3 id="modal-emp-titulo">Nuevo empleado</h3>
+      <h3 id="modal-emp-titulo">Nuevo trabajador</h3>
       <button class="modal-cerrar" onclick="cerrar('modal-emp')">×</button>
     </div>
     <input type="hidden" id="emp-id">
@@ -493,7 +493,7 @@
     <input type="hidden" id="pago-id">
     <div class="fila2">
       <div class="campo-form"><label>Fecha</label><input type="date" id="pago-fecha"></div>
-      <div class="campo-form"><label>Empleado</label><select id="pago-emp"></select></div>
+      <div class="campo-form"><label>Trabajador</label><select id="pago-emp"></select></div>
     </div>
     <div class="campo-form autobox">
       <label>Categoría / Descripción</label>
@@ -529,7 +529,7 @@
       <div class="campo-form"><label>Cantidad de has</label><input type="number" id="labor-has" step="0.01" placeholder="0" oninput="previewLabor()"></div>
     </div>
     <div class="campo-form">
-      <label>Empleados que realizaron la labor</label>
+      <label>Trabajadores que realizaron la labor</label>
       <div class="emp-chips" id="labor-chips"></div>
     </div>
     <div class="tarjeta" id="labor-preview" style="background:#f0f6ee;border-color:var(--campo-claro);display:none">
@@ -551,7 +551,7 @@
     <input type="hidden" id="gan-id">
     <div class="fila2">
       <div class="campo-form"><label>Mes que corresponde</label><input type="month" id="gan-mes"></div>
-      <div class="campo-form"><label>Empleado</label><select id="gan-emp"></select></div>
+      <div class="campo-form"><label>Trabajador</label><select id="gan-emp"></select></div>
     </div>
     <div class="campo-form">
       <label>Detalle de la liquidación</label>
@@ -676,9 +676,9 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.querySelec
 /* ---- Empleado ---- */
 function abrirModalEmp(id){
   $('emp-id').value=id||'';
-  if(id){const e=empleados[id];$('modal-emp-titulo').textContent='Editar empleado';
+  if(id){const e=empleados[id];$('modal-emp-titulo').textContent='Editar trabajador';
     $('emp-nombre').value=e.nombre;$('emp-cuit').value=e.cuit||'';$('emp-pct').value=e.pct;$('emp-estado').value=e.estado||'activo';}
-  else{$('modal-emp-titulo').textContent='Nuevo empleado';$('emp-nombre').value='';$('emp-cuit').value='';$('emp-pct').value='';$('emp-estado').value='activo';}
+  else{$('modal-emp-titulo').textContent='Nuevo trabajador';$('emp-nombre').value='';$('emp-cuit').value='';$('emp-pct').value='';$('emp-estado').value='activo';}
   abrir('modal-emp');
 }
 function guardarEmp(){
@@ -688,7 +688,7 @@ function guardarEmp(){
   if(!nombre){toast('Poné un nombre');return;}
   const id=$('emp-id').value||uid();
   const orden=$('emp-id').value?(empleados[id].orden||Date.now()):Date.now();
-  guardar('empleados/'+id,{nombre,cuit,pct,estado:$('emp-estado').value,orden},'Empleado guardado');
+  guardar('empleados/'+id,{nombre,cuit,pct,estado:$('emp-estado').value,orden},'Trabajador guardado');
   cerrar('modal-emp');
 }
 function toggleEstado(id){
@@ -696,8 +696,8 @@ function toggleEstado(id){
   guardar('empleados/'+id,{...e,estado:e.estado==='activo'?'inactivo':'activo'},'Estado actualizado');
 }
 function borrarEmp(id){
-  if(confirm('¿Eliminar empleado? Sus registros quedarán sin asignar.')){
-    borrarRegistro('empleados/'+id,'Empleado eliminado');
+  if(confirm('¿Eliminar trabajador? Sus registros quedarán sin asignar.')){
+    borrarRegistro('empleados/'+id,'Trabajador eliminado');
   }
 }
 
@@ -715,7 +715,7 @@ function abrirModalPago(id){
 function guardarPago(){
   const emp=$('pago-emp').value, cat=$('pago-cat').value.trim();
   const monto=parseFloat($('pago-monto').value)||0;
-  if(!emp){toast('Elegí un empleado');return;}
+  if(!emp){toast('Elegí un trabajador');return;}
   if(!cat){toast('Poné una categoría/descripción');return;}
   if(!monto){toast('Poné un importe');return;}
   const id=$('pago-id').value||uid();
@@ -741,7 +741,7 @@ function abrirModalLabor(id){
 function renderChipsLabor(){
   const cont=$('labor-chips');cont.innerHTML='';
   const activos=Object.entries(empleados).filter(([id,e])=>e.estado!=='inactivo'||editLaborChips[id]!==undefined);
-  if(!activos.length){cont.innerHTML='<p class="sub">No hay empleados. Cargá empleados primero.</p>';return;}
+  if(!activos.length){cont.innerHTML='<p class="sub">No hay trabajadores. Cargá trabajadores primero.</p>';return;}
   activos.sort((a,b)=>(a[1].orden||0)-(b[1].orden||0));
   activos.forEach(([id,e])=>{
     const sel=editLaborChips[id]!==undefined;
@@ -782,7 +782,7 @@ function guardarLabor(){
   const precio=parseFloat($('labor-precio').value)||0, has=parseFloat($('labor-has').value)||0;
   const ids=Object.keys(editLaborChips);
   if(!act){toast('Poné la actividad');return;}
-  if(!ids.length){toast('Seleccioná al menos un empleado');return;}
+  if(!ids.length){toast('Seleccioná al menos un trabajador');return;}
   if(!precio||!has){toast('Completá precio y has');return;}
   const n=ids.length;
   const participantes=ids.map(id=>{
@@ -858,7 +858,7 @@ function previewGan(){
 function guardarGan(){
   const mes=$('gan-mes').value, emp=$('gan-emp').value;
   if(!mes){toast('Elegí el mes que corresponde');return;}
-  if(!emp){toast('Elegí el empleado');return;}
+  if(!emp){toast('Elegí el trabajador');return;}
   const items=editItems
     .filter(i=>(i.desc||'').trim() && (parseFloat(i.monto)||0)!==0)
     .map(i=>({desc:capitalizar(i.desc),monto:parseFloat(i.monto)||0,signo:i.signo===-1?-1:1}));
@@ -1031,7 +1031,7 @@ function renderDashboard(){
   let avisoFiltro='';
   if(filtrando){
     const partes=[];
-    if(femp) partes.push('empleado: '+(empleados[femp]?empleados[femp].nombre:'—'));
+    if(femp) partes.push('trabajador: '+(empleados[femp]?empleados[femp].nombre:'—'));
     if(fmes) partes.push(nombreMes(fmes));
     else if(fdd||fhh) partes.push((fdd?fechaLinda(fdd):'inicio')+' a '+(fhh?fechaLinda(fhh):'hoy'));
     avisoFiltro=`<div class="aviso-filtro">📌 Mostrando solo: ${partes.join(' · ')}. <a href="#" onclick="limpiarFiltros('dash');return false;">Ver todo</a></div>`;
@@ -1046,7 +1046,7 @@ function renderDashboard(){
     <div class="total-card"><div class="et">${etFact}</div><div class="num">${plata(facturacion)}</div></div>
     ${cardMargen}
     <div class="total-card paga"><div class="et">Total abonado</div><div class="num" style="color:var(--rojo)">${plata(totalPagado)}</div></div>
-    <div class="total-card saldo"><div class="et">Saldo a empleados</div><div class="num">${plata(saldoEmpleados)}</div></div>`;
+    <div class="total-card saldo"><div class="et">Saldo a trabajadores</div><div class="num">${plata(saldoEmpleados)}</div></div>`;
   $('dash-kpis').insertAdjacentHTML('beforebegin','');
   // colocar aviso justo antes de los KPIs (limpio el anterior si existe)
   const viejo=document.getElementById('aviso-filtro-dash'); if(viejo)viejo.remove();
@@ -1055,13 +1055,13 @@ function renderDashboard(){
   // ----- SUGERENCIAS -----
   const sug=[];
   if(saldoEmpleados>0){
-    sug.push({t:'alerta',ico:'⚠️',titulo:'Saldo pendiente con empleados',
-      txt:`A los empleados les corresponde ${plata(correspondeEmp)} por las labores y pagaste ${plata(totalPagado)}. Quedan <b>${plata(saldoEmpleados)}</b> por liquidar. Planificá estos pagos para no acumular deuda.`});
+    sug.push({t:'alerta',ico:'⚠️',titulo:'Saldo pendiente con trabajadores',
+      txt:`A los trabajadores les corresponde ${plata(correspondeEmp)} por las labores y pagaste ${plata(totalPagado)}. Quedan <b>${plata(saldoEmpleados)}</b> por liquidar. Planificá estos pagos para no acumular deuda.`});
   } else if(saldoEmpleados<0){
     sug.push({t:'alerta',ico:'🔴',titulo:'Pagaste por encima de lo generado',
       txt:`Abonaste ${plata(-saldoEmpleados)} más de lo que les corresponde por labores hasta ahora. Suele pasar por adelantos: tenelo presente al liquidar.`});
   } else {
-    sug.push({t:'ok',ico:'✅',titulo:'Cuentas al día con los empleados',
+    sug.push({t:'ok',ico:'✅',titulo:'Cuentas al día con los trabajadores',
       txt:'Lo que corresponde y lo pagado están equilibrados.'});
   }
   // mano de obra sobre facturación
@@ -1086,7 +1086,7 @@ function renderDashboard(){
   let instrum=0; Object.values(pagos).forEach(p=>{ if((p.cat||'').toLowerCase().includes('instrumento'))instrum+=p.monto; });
   if(instrum>0){
     sug.push({t:'',ico:'🧰',titulo:'Gasto en instrumentos personales',
-      txt:`Llevás ${plata(instrum)} en instrumentos personales, un costo no salarial. Seguilo aparte al medir el costo real de cada empleado.`});
+      txt:`Llevás ${plata(instrum)} en instrumentos personales, un costo no salarial. Seguilo aparte al medir el costo real de cada trabajador.`});
   }
 
   if(totalGanadero>0){
@@ -1229,7 +1229,7 @@ function renderEmpleados(){
     if(ina!==inb)return ina-inb;
     return (a[1].orden||0)-(b[1].orden||0);
   });
-  if(!arr.length){cont.innerHTML=vacio('👥','Todavía no agregaste empleados');return;}
+  if(!arr.length){cont.innerHTML=vacio('👥','Todavía no agregaste trabajadores');return;}
   cont.innerHTML=arr.map(([id,e])=>{
     const ina=e.estado==='inactivo';
     return `<div class="emp-item ${ina?'inact':''}">
@@ -1293,7 +1293,7 @@ function imprimirResumen(){
   });
   regs.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   const saldo=gana-paga;
-  const titulo = filtroEmp==='__todos__' ? 'Todos los empleados' : (empleados[filtroEmp]?empleados[filtroEmp].nombre:'—');
+  const titulo = filtroEmp==='__todos__' ? 'Todos los trabajadores' : (empleados[filtroEmp]?empleados[filtroEmp].nombre:'—');
 
   const filas=regs.map(r=>{
     const e=empleados[r.emp];
@@ -1339,7 +1339,7 @@ function imprimirResumen(){
     @media print{body{padding:18px}}
   </style></head><body>
     <div class="cab"><img src="${LOGO_PDF}"><div><h1>El Mestizo</h1><p class="sub">Resumen de cuenta — Servicios agrícolas</p></div></div>
-    <div class="meta">Empleado: <b>${titulo}</b>${filtroEmp!=='__todos__'&&empleados[filtroEmp]&&empleados[filtroEmp].cuit?' &nbsp;·&nbsp; CUIT/CUIL: <b>'+empleados[filtroEmp].cuit+'</b>':''} &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
+    <div class="meta">Trabajador: <b>${titulo}</b>${filtroEmp!=='__todos__'&&empleados[filtroEmp]&&empleados[filtroEmp].cuit?' &nbsp;·&nbsp; CUIT/CUIL: <b>'+empleados[filtroEmp].cuit+'</b>':''} &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
     <div class="tot">
       <div><div class="et">Le corresponde</div><div class="num verde">${plata(gana)}</div></div>
       <div><div class="et">Pagado</div><div class="num rojo">${plata(paga)}</div></div>
@@ -1349,8 +1349,8 @@ function imprimirResumen(){
       <thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th class="der">Importe</th></tr></thead>
       <tbody>${filas||'<tr><td colspan=4 style="text-align:center;color:#9a9a8e;padding:20px">Sin movimientos</td></tr>'}</tbody>
     </table>
-    <div class="firma"><div>Firma empleado</div><div>Firma empleador</div></div>
-    <div class="pie">Documento generado por la app Empleados — El Mestizo · ${fechaImp}</div>
+    <div class="firma"><div>Firma trabajador</div><div>Firma empleador</div></div>
+    <div class="pie">El Mestizo — Gestión de Trabajadores · ${fechaImp}</div>
     <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
   </body></html>`;
 
@@ -1418,7 +1418,7 @@ function imprimirGanMes(id){
     @media print{body{padding:18px}}
   </style></head><body>
     <div class="cab"><img src="${LOGO_PDF}"><div><h1>El Mestizo</h1><p class="sub">Liquidación mensual — Contrato ganadero</p></div></div>
-    <div class="meta">Empleado: <b>${nombre}</b>${e&&e.cuit?' &nbsp;·&nbsp; CUIT/CUIL: <b>'+e.cuit+'</b>':''} &nbsp;·&nbsp; Período: <b>${nombreMes(g.mes)}</b> &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
+    <div class="meta">Trabajador: <b>${nombre}</b>${e&&e.cuit?' &nbsp;·&nbsp; CUIT/CUIL: <b>'+e.cuit+'</b>':''} &nbsp;·&nbsp; Período: <b>${nombreMes(g.mes)}</b> &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
     <div class="tot">
       <div><div class="et">Total liquidado</div><div class="num verde">${plata(g.total||0)}</div></div>
       <div><div class="et">Abonado en el mes</div><div class="num rojo">${plata(totalPagosMes)}</div></div>
@@ -1442,8 +1442,8 @@ function imprimirGanMes(id){
       <tbody>${filasPagos||'<tr><td colspan=3 style="text-align:center;color:#9a9a8e;padding:20px">Sin pagos registrados en este mes</td></tr>'}</tbody>
     </table>
     ${g.obs?`<div class="obs"><b>Observaciones:</b> ${g.obs}</div>`:''}
-    <div class="firma"><div>Firma empleado</div><div>Firma empleador</div></div>
-    <div class="pie">Documento generado por la app Empleados — El Mestizo · ${fechaImp}</div>
+    <div class="firma"><div>Firma trabajador</div><div>Firma empleador</div></div>
+    <div class="pie">El Mestizo — Gestión de Trabajadores · ${fechaImp}</div>
     <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
   </body></html>`;
 
@@ -1575,7 +1575,7 @@ function importarBackup(input){
       const np=Object.keys(data.pagos||{}).length;
       const nl=Object.keys(data.labores||{}).length;
       const ng=Object.keys(data.ganaderos||{}).length;
-      $('restaurar-info').textContent=`El archivo contiene ${ne} empleados, ${np} pagos, ${nl} labores y ${ng} servicios ganaderos`+(data._fecha?` (backup del ${fechaLinda(data._fecha.slice(0,10))})`:'')+'.';
+      $('restaurar-info').textContent=`El archivo contiene ${ne} trabajadores, ${np} pagos, ${nl} labores y ${ng} servicios ganaderos`+(data._fecha?` (backup del ${fechaLinda(data._fecha.slice(0,10))})`:'')+'.';
       abrir('modal-restaurar');
     }catch(err){toast('No pude leer el archivo. ¿Es un backup .json?');}
   };

@@ -1489,15 +1489,45 @@ function compartirComoPDF(html,archivo,titulo){
     fr.onload=async()=>{
       try{
         await new Promise(r=>setTimeout(r,400));
-        const canvas=await html2canvas(fr.contentDocument.body,{scale:2,backgroundColor:'#ffffff',windowWidth:820});
+        const bruto=await html2canvas(fr.contentDocument.body,{scale:2,backgroundColor:'#ffffff',windowWidth:820});
+        // recortar el blanco sobrante de abajo (detecta dónde termina el contenido real)
+        let canvas=bruto;
+        try{
+          const cx=bruto.getContext('2d');
+          const datos=cx.getImageData(0,0,bruto.width,bruto.height).data;
+          let ultima=bruto.height-1, corte=false;
+          busq: for(let y=bruto.height-1;y>=0;y--){
+            for(let x=0;x<bruto.width;x+=8){
+              const i=(y*bruto.width+x)*4;
+              if(datos[i]<245||datos[i+1]<245||datos[i+2]<245){ultima=y;corte=true;break busq;}
+            }
+          }
+          const alto=Math.min(bruto.height,ultima+64); // margencito inferior
+          if(corte && alto<bruto.height-20){
+            const c2=document.createElement('canvas');
+            c2.width=bruto.width; c2.height=alto;
+            c2.getContext('2d').drawImage(bruto,0,0);
+            canvas=c2;
+          }
+        }catch(e){/* si falla el recorte, sigue con el canvas completo */}
         const {jsPDF}=window.jspdf;
         const pdf=new jsPDF('p','mm','a4');
         const pw=210, ph=297;
         const ih=canvas.height*pw/canvas.width;
         const img=canvas.toDataURL('image/jpeg',0.92);
-        pdf.addImage(img,'JPEG',0,0,pw,ih);
-        let restante=ih-ph, pos=0;
-        while(restante>0){ pos-=ph; pdf.addPage(); pdf.addImage(img,'JPEG',0,pos,pw,ih); restante-=ph; }
+        if(ih<=ph){
+          // entra en una hoja
+          pdf.addImage(img,'JPEG',0,0,pw,ih);
+        }else if(ih<=ph*1.18){
+          // se pasa apenas: se encoge un poquito para que entre en UNA sola hoja
+          const f=ph/ih;
+          pdf.addImage(img,'JPEG',(pw-pw*f)/2,0,pw*f,ph);
+        }else{
+          // contenido realmente largo: paginar, descartando páginas finales casi vacías
+          pdf.addImage(img,'JPEG',0,0,pw,ih);
+          let restante=ih-ph, pos=0;
+          while(restante>10){ pos-=ph; pdf.addPage(); pdf.addImage(img,'JPEG',0,pos,pw,ih); restante-=ph; }
+        }
         const blob=pdf.output('blob');
         const file=new File([blob],archivo,{type:'application/pdf'});
         if(navigator.canShare && navigator.canShare({files:[file]})){

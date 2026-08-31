@@ -1354,7 +1354,6 @@ function armarHTMLResumen(){
       <thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th class="der">Importe</th></tr></thead>
       <tbody>${filas||'<tr><td colspan=4 style="text-align:center;color:#9a9a8e;padding:20px">Sin movimientos</td></tr>'}</tbody>
     </table>
-    <div class="firma"><div>Firma trabajador</div><div>Firma empleador</div></div>
     <div class="pie">El Mestizo — Gestión de Trabajadores · ${fechaImp}</div>
     <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
   </body></html>`;
@@ -1445,7 +1444,6 @@ function armarHTMLGan(id){
       <tbody>${filasPagos||'<tr><td colspan=3 style="text-align:center;color:#9a9a8e;padding:20px">Sin pagos registrados en este mes</td></tr>'}</tbody>
     </table>
     ${g.obs?`<div class="obs"><b>Observaciones:</b> ${g.obs}</div>`:''}
-    <div class="firma"><div>Firma trabajador</div><div>Firma empleador</div></div>
     <div class="pie">El Mestizo — Gestión de Trabajadores · ${fechaImp}</div>
     <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
   </body></html>`;

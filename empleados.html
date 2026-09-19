@@ -507,6 +507,7 @@
             <div class="campo-form"><label>Estado</label><select id="lf-estado"><option value="">Todos</option><option value="FACT">Facturado</option><option value="S/F">Sin facturar</option></select></div>
             <div class="campo-form"><label>Maquinista</label><select id="lf-maq"><option value="">Todos</option></select></div>
           </div>
+          <div class="campo-form"><label>Cultivo</label><select id="lf-cultivo"><option value="">Todos</option></select></div>
           <div class="campo-form"><label>Buscar (lote / observaciones / N° factura)</label><input id="lf-txt" placeholder="Ej: 18 SUR"></div>
           <div class="fila2">
             <button class="btn peq linea" onclick="ltMostrar=120;render()">Aplicar</button>
@@ -724,7 +725,10 @@
       <div class="campo-form autobox"><label>Establecimiento</label><input id="lo-estab" autocomplete="off" placeholder="Ej: LA VASCA" oninput="autocompletar(this,'estabs')" onfocus="autocompletar(this,'estabs')"><div class="sugerencias"></div></div>
       <div class="campo-form autobox"><label>Lote</label><input id="lo-lote" autocomplete="off" placeholder="Ej: 18 SUR" oninput="autocompletar(this,'lotesNom')" onfocus="autocompletar(this,'lotesNom')"><div class="sugerencias"></div></div>
     </div>
-    <div class="campo-form"><label>Labor</label><select id="lo-labor" onchange="difLote()"></select></div>
+    <div class="fila2">
+      <div class="campo-form"><label>Labor</label><select id="lo-labor" onchange="difLote()"></select></div>
+      <div class="campo-form autobox"><label>Cultivo (opcional)</label><input id="lo-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío…" oninput="autocompletar(this,'cultivos')" onfocus="autocompletar(this,'cultivos')"><div class="sugerencias"></div></div>
+    </div>
     <div class="fila2">
       <div class="campo-form"><label id="lo-cant-lbl">Cantidad (monitor)</label><input type="number" id="lo-cant" step="0.01" placeholder="0" oninput="difLote()"></div>
       <div class="campo-form"><label>A facturar (pool)</label><input type="number" id="lo-fact" step="0.01" placeholder="Igual que monitor si vacío" oninput="difLote()"></div>
@@ -1211,7 +1215,7 @@ function valoresUsados(tipo){
   if(tipo==='lotesNom'){const e=($('lo-estab')?$('lo-estab').value.trim().toUpperCase():'');Object.values(lotes).forEach(l=>{if(l.lote&&(!e||l.estab===e))set.add(l.lote);});}
   if(tipo==='maqs')Object.values(lotes).forEach(l=>l.maq&&set.add(l.maq));
   if(tipo==='marcasGasoil')Object.values(gasoil).forEach(g=>g.marca&&set.add(g.marca));
-  if(tipo==='cultivos'){CULTIVOS_BASE.forEach(c=>set.add(c));Object.values(preciosLab).forEach(p=>p.cultivo&&set.add(p.cultivo));}
+  if(tipo==='cultivos'){CULTIVOS_BASE.forEach(c=>set.add(c));Object.values(preciosLab).forEach(p=>p.cultivo&&set.add(p.cultivo));Object.values(lotes).forEach(l=>l.cultivo&&set.add(l.cultivo));}
   if(tipo==='itemsgan'){
     ITEMS_GAN_BASE.forEach(a=>set.add(a));
     Object.values(ganaderos).forEach(g=>(g.items||[]).forEach(i=>i.desc&&set.add(i.desc)));
@@ -1276,7 +1280,7 @@ function limpiarFiltros(t){
   if(t==='labor'){['fl-desde','fl-hasta','fl-txt'].forEach(i=>$(i).value='');$('fl-act').value='';$('fl-emp').value='';}
   else if(t==='pago'){['fp-desde','fp-hasta','fp-txt'].forEach(i=>$(i).value='');$('fp-cat').value='';$('fp-emp').value='';}
   else if(t==='cuenta'){['fc-desde','fc-hasta','fc-txt'].forEach(i=>$(i).value='');$('fc-tipo').value='';$('fc-act').value='';}
-  else if(t==='lotes'){['lf-desde','lf-hasta','lf-txt'].forEach(i=>$(i).value='');['lf-estab','lf-labor','lf-estado','lf-maq'].forEach(i=>$(i).value='');ltMostrar=120;}
+  else if(t==='lotes'){['lf-desde','lf-hasta','lf-txt'].forEach(i=>$(i).value='');['lf-estab','lf-labor','lf-estado','lf-maq','lf-cultivo'].forEach(i=>$(i).value='');ltMostrar=120;}
   else if(t==='dash'){['fd-desde','fd-hasta'].forEach(i=>$(i).value='');$('fd-mes').value='';$('fd-emp').value='';}
   render();
 }
@@ -1621,6 +1625,18 @@ function normalizarCultivo(s){
   if(tardio)base+=' tardío'; else if(segunda)base+=' 2da'; else if(primera)base+=' 1ra';
   return base;
 }
+/* detecta el cultivo en cualquier observación de lote ("BOLSON 1 SOJA", "SIEMBRA DE MAIZ TARDIO"...) */
+function cultivoDesdeObsLote(obs){
+  const t=(obs||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(!t||/rastrojo/.test(t))return '';
+  if(/cobert/.test(t))return 'Cobertura';
+  const CROPS=['soja','maiz','trigo','girasol','cebada','sorgo','avena','centeno','alfalfa','pastura','agropiro','triticale','vicia','verdeo','mani','colza'];
+  const crop=CROPS.find(c=>new RegExp('\\b'+c+'\\b').test(t));
+  if(!crop)return '';
+  if(crop==='maiz'&&/pisingallo/.test(t))return 'Maíz pisingallo';
+  const tardio=/tard/.test(t), segunda=/\b(2da|segunda|ii)\b/.test(t);
+  return normalizarCultivo(crop+(tardio?' tardio':'')+(segunda?' 2da':''));
+}
 /* saca el cultivo de una observación tipo "Siembra de Soja 2da" */
 function cultivoDesdeObs(obs){
   const o=(obs||'').trim(); if(!o)return '';
@@ -1648,6 +1664,13 @@ function chequearMigracionLt(){
     const extra=[...new Set(Object.values(lotes).map(l=>l.labor).filter(x=>x&&x!==NOMBRE_VIEJO_COSECHA&&!LABORES_BASE.some(b=>b.n===x)))];
     extra.forEach((x,i)=>{up['tiposLabor/tlx'+(i+1)]={n:x,u:'ha',orden:100+i};});
   }
+  // cultivo en registros de lote: detectar desde la observación (la observación se conserva)
+  let nlc=0;
+  Object.entries(lotes).forEach(([id,l])=>{
+    if(l.cultivo!==undefined)return;
+    const c=cultivoDesdeObsLote(l.obs);
+    up['lotes/'+id+'/cultivo']=c; if(c)nlc++;
+  });
   // cultivo: pasar desde observaciones a los precios que aún no lo tienen
   let nc=0;
   Object.entries(preciosLab).forEach(([id,p])=>{
@@ -1657,7 +1680,10 @@ function chequearMigracionLt(){
     if(c){nc++;up['preciosLab/'+id+'/obs']='';}
   });
   if(Object.keys(up).length){
-    db.ref().update(up).then(()=>{if(n)toast(`${n} registros renombrados a "Cosecha"`);else if(nc)toast(`Cultivo asignado a ${nc} precios desde sus observaciones`);}).catch(()=>{});
+    db.ref().update(up).then(()=>{
+      const msgs=[]; if(n)msgs.push(`${n} renombrados a "Cosecha"`); if(nlc)msgs.push(`cultivo detectado en ${nlc} registros de lote`); if(nc)msgs.push(`cultivo asignado a ${nc} precios`);
+      if(msgs.length)toast(msgs.join(' · '));
+    }).catch(()=>{});
   }
 }
 function num2(n){n=Number(n)||0;return n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2});}
@@ -1681,9 +1707,12 @@ function llenarSelectLabores(sel,incluirVacio){
 function llenarFiltrosLotes(){
   const estabs=[...new Set(Object.values(lotes).map(l=>l.estab).filter(Boolean))].sort();
   const maqs=[...new Set(Object.values(lotes).map(l=>l.maq).filter(Boolean))].sort();
-  const s1=$('lf-estab'),s2=$('lf-maq'),s3=$('lf-labor');
+  const s1=$('lf-estab'),s2=$('lf-maq'),s3=$('lf-labor'),s4=$('lf-cultivo');
   if(!s1)return;
-  const v1=s1.value,v2=s2.value,v3=s3.value;
+  const v1=s1.value,v2=s2.value,v3=s3.value,v4=s4.value;
+  const cults=[...new Set(Object.values(lotes).map(l=>l.cultivo).filter(Boolean))].sort();
+  s4.innerHTML='<option value="">Todos</option>'+cults.map(c=>`<option>${c}</option>`).join('');
+  s4.value=v4;
   s1.innerHTML='<option value="">Todos</option>'+estabs.map(e=>`<option>${e}</option>`).join('');
   s2.innerHTML='<option value="">Todos</option>'+maqs.map(e=>`<option>${e}</option>`).join('');
   llenarSelectLabores(s3,true);
@@ -1705,7 +1734,7 @@ function renderLotes(){
     `<div class="pest ${ltPlanilla==='PROPIO'?'activa':''}" onclick="seleccionarPlanilla('PROPIO')">Propio (${cnt.PROPIO})</div>`;
 
   const d=$('lf-desde').value,h=$('lf-hasta').value,fe=$('lf-estab').value,fl=$('lf-labor').value,
-        fs=$('lf-estado').value,fm=$('lf-maq').value,ft=$('lf-txt').value.trim().toLowerCase();
+        fs=$('lf-estado').value,fm=$('lf-maq').value,fcu=$('lf-cultivo').value,ft=$('lf-txt').value.trim().toLowerCase();
   let arr=Object.entries(lotes).filter(([id,l])=>{
     if(ltPlanilla!=='__todas__'&&l.planilla!==ltPlanilla)return false;
     if(!entreFechas(l.fecha,d,h))return false;
@@ -1713,6 +1742,7 @@ function renderLotes(){
     if(fl&&l.labor!==fl)return false;
     if(fs&&(l.estado||'S/F')!==fs)return false;
     if(fm&&l.maq!==fm)return false;
+    if(fcu&&(l.cultivo||'')!==fcu)return false;
     if(ft&&!((l.lote||'')+' '+(l.obs||'')+' '+(l.nroFact||'')+' '+(l.estab||'')).toLowerCase().includes(ft))return false;
     return true;
   }).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
@@ -1751,7 +1781,7 @@ function renderLotes(){
           <span class="etiqueta ${sf?'et-sf':'et-fact'}">${sf?'S/F':'FACT'}</span>
           <span class="reg-titulo">${l.estab||'—'}${l.lote?' · Lote '+l.lote:''}</span>
         </div>
-        <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🚜 ${l.labor}${l.maq?' · 👤 '+l.maq:''}</div>
+        <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🚜 ${l.labor}${l.cultivo?' · 🌱 '+l.cultivo:''}${l.maq?' · 👤 '+l.maq:''}</div>
         <div class="reg-meta">${l.planilla==='BERNARDO'&&fact!=null&&Math.abs(dif)>0.005?`Monitor <b>${num2(l.cant)}</b> · A facturar <b>${num2(fact)}</b> · Dif. <span class="${dif>0?'dif-mal':'dif-ok'}">${num2(dif)}</span>`:''}${l.planilla==='BERNARDO'&&l.dif?` · Ajuste ${num2(l.dif)}`:''}${l.nroFact&&l.nroFact!=='0'?` · 🧾 ${l.nroFact}${l.fechaFact?' ('+fechaLinda(l.fechaFact)+')':''}`:''}</div>
         ${l.obs?`<div class="reg-obs">${l.obs}</div>`:''}
         <div class="reg-acc">
@@ -1773,6 +1803,7 @@ function abrirModalLote(id){
   $('lo-estab').value=l?l.estab||'':'';
   $('lo-lote').value=l?l.lote||'':'';
   $('lo-labor').value=l?l.labor:listaLabores()[0].n;
+  $('lo-cultivo').value=l?l.cultivo||'':'';
   $('lo-cant').value=l?(l.cant||''):'';
   $('lo-fact').value=l&&l.fact!=null?l.fact:'';
   $('lo-estado').value=l?(l.estado||'S/F'):'S/F';
@@ -1796,10 +1827,11 @@ function guardarLote(){
   if(!estab){toast('Poné el establecimiento');return;}
   const cant=parseFloat($('lo-cant').value)||0;
   if(!cant){toast('Poné la cantidad');return;}
-  const obj={planilla:$('lo-planilla').value,fecha,estab,lote:$('lo-lote').value.trim(),labor:$('lo-labor').value,
+  const obj={planilla:$('lo-planilla').value,fecha,estab,lote:$('lo-lote').value.trim(),labor:$('lo-labor').value,cultivo:normalizarCultivo($('lo-cultivo').value),
     cant,estado:$('lo-estado').value,fechaFact:$('lo-fechaFact').value,nroFact:$('lo-nroFact').value.trim(),
     maq:$('lo-maq').value.trim().toUpperCase(),obs:$('lo-obs').value.trim()};
   if($('lo-fact').value!=='')obj.fact=parseFloat($('lo-fact').value)||0;
+  if(!obj.cultivo)obj.cultivo=cultivoDesdeObsLote(obj.obs);
   const id=$('lo-id').value||uid();
   guardar('lotes/'+id,obj,'Labor guardada');
   cerrar('modal-lote');
@@ -2255,7 +2287,7 @@ function armarHTMLCliente(){
       <td>${fechaLinda(l.fecha)}</td>
       ${multiEstab?`<td>${l.estab||'—'}</td>`:''}
       <td>${l.lote||'—'}</td>
-      <td>${l.labor}${o.conObs&&l.obs?`<br><span class="det">${l.obs}</span>`:''}</td>
+      <td>${l.labor}${l.cultivo?` <span class="det">· ${l.cultivo}</span>`:''}${o.conObs&&l.obs?`<br><span class="det">${l.obs}</span>`:''}</td>
       <td class="der">${num2(cant)} ${u}</td>
       ${o.conPrecios?`<td class="der">${pr?plata(pr.importe):'—'}</td><td class="der">${imp!=null?plata(imp):'—'}</td>`:''}
       ${o.que!=='sf'?`<td>${sf?'<span class="rojo">Pendiente</span>':(l.nroFact&&l.nroFact!=='0'?'Fact. '+l.nroFact:'Facturado')}</td>`:''}

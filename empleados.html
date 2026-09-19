@@ -546,8 +546,9 @@
           <p class="sub" style="margin:0 0 10px">Elegí un precio puntual (por ejemplo, la siembra de soja del año pasado) y te calcula cuánto valdría a la fecha elegida.</p>
           <div class="fila2">
             <div class="campo-form"><label>Labor</label><select id="cmp-labor" onchange="llenarCmpPrecios()"><option value="">Todas</option></select></div>
-            <div class="campo-form"><label>Precio del historial</label><select id="cmp-precio"></select></div>
+            <div class="campo-form"><label>Cultivo</label><select id="cmp-cultivo" onchange="llenarCmpPrecios()"><option value="">Todos</option></select></div>
           </div>
+          <div class="campo-form"><label>Precio del historial</label><select id="cmp-precio"></select></div>
           <div class="fila2">
             <button class="btn peq" onclick="agregarCmp()">+ Agregar a la comparación</button>
             <button class="btn peq gris" onclick="calcSel=[];calcularPrecios()">Limpiar comparación</button>
@@ -753,6 +754,7 @@
       <div class="campo-form"><label id="pr-importe-lbl">Importe ($ por ha)</label><input type="number" id="pr-importe" step="0.01" placeholder="0"></div>
       <div class="campo-form" id="pr-rinde-box" style="display:none"><label>Rinde (tn/ha)</label><input type="number" id="pr-rinde" step="0.1" placeholder="Ej: 7,1"></div>
     </div>
+    <div class="campo-form autobox"><label>Cultivo (opcional)</label><input id="pr-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío, Soja 2da…" oninput="autocompletar(this,'cultivos')" onfocus="autocompletar(this,'cultivos')"><div class="sugerencias"></div></div>
     <div class="campo-form"><label>Observaciones</label><input id="pr-obs" placeholder="Opcional (cliente, factura, etc.)"></div>
     <button class="btn" onclick="guardarPrecio()">Guardar</button>
     <button class="btn-cancelar" onclick="cerrar('modal-precio')">Cancelar</button>
@@ -1172,6 +1174,7 @@ function valoresUsados(tipo){
   if(tipo==='lotesNom'){const e=($('lo-estab')?$('lo-estab').value.trim().toUpperCase():'');Object.values(lotes).forEach(l=>{if(l.lote&&(!e||l.estab===e))set.add(l.lote);});}
   if(tipo==='maqs')Object.values(lotes).forEach(l=>l.maq&&set.add(l.maq));
   if(tipo==='marcasGasoil')Object.values(gasoil).forEach(g=>g.marca&&set.add(g.marca));
+  if(tipo==='cultivos'){CULTIVOS_BASE.forEach(c=>set.add(c));Object.values(preciosLab).forEach(p=>p.cultivo&&set.add(p.cultivo));}
   if(tipo==='itemsgan'){
     ITEMS_GAN_BASE.forEach(a=>set.add(a));
     Object.values(ganaderos).forEach(g=>(g.items||[]).forEach(i=>i.desc&&set.add(i.desc)));
@@ -1567,6 +1570,29 @@ const LABORES_BASE=[
   {n:'Embolsado',u:'tn'},{n:'Extracción cereal',u:'tn'}
 ];
 const NOMBRE_VIEJO_COSECHA='Labores varias / Cosecha';
+const CULTIVOS_BASE=['Soja','Soja 2da','Maíz','Maíz tardío','Trigo','Girasol','Cebada','Sorgo','Avena','Centeno','Alfalfa','Pastura'];
+/* unifica variantes: "maiz tardio"→"Maíz tardío", "soja II / soja 2da / soja segunda"→"Soja 2da" */
+function normalizarCultivo(s){
+  s=(s||'').trim(); if(!s)return '';
+  let t=s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const tardio=/tard/.test(t);
+  const segunda=/\b(ii|2da|2°|2º|2a|segunda|2)\b/.test(t);
+  const primera=/\b(1ra|1°|1º|1a|primera)\b/.test(t);
+  t=t.replace(/\b(tardio|tardia|ii|2da|2°|2º|2a|segunda|1ra|1°|1º|1a|primera|de|del)\b/g,' ').replace(/\s+/g,' ').trim();
+  const MAPA={'maiz':'Maíz','soja':'Soja','trigo':'Trigo','girasol':'Girasol','cebada':'Cebada','sorgo':'Sorgo','avena':'Avena','centeno':'Centeno','alfalfa':'Alfalfa','pastura':'Pastura','mani':'Maní','arveja':'Arveja','colza':'Colza','triticale':'Triticale','verdeo':'Verdeo'};
+  let base=MAPA[t]||t.split(' ').map(w=>w?w.charAt(0).toUpperCase()+w.slice(1):w).join(' ');
+  if(tardio)base+=' tardío'; else if(segunda)base+=' 2da'; else if(primera)base+=' 1ra';
+  return base;
+}
+/* saca el cultivo de una observación tipo "Siembra de Soja 2da" */
+function cultivoDesdeObs(obs){
+  const o=(obs||'').trim(); if(!o)return '';
+  const m=o.match(/^(siembra|cosecha|embolsado|extracci[oó]n|disco|rolo|pulverizaci[oó]n|labor(?:es)?)[^,;:]*?\s+de\s+(.+)$/i);
+  if(m)return normalizarCultivo(m[2]);
+  const t=o.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(/^(soja|maiz|trigo|girasol|cebada|sorgo|avena|centeno|alfalfa|pastura|mani|colza|triticale|verdeo)\b/.test(t)&&t.length<30)return normalizarCultivo(o);
+  return '';
+}
 function listaLabores(){
   const arr=Object.entries(tiposLabor).map(([id,t])=>({id,n:t.n,u:t.u||'ha',orden:t.orden||0})).sort((a,b)=>a.orden-b.orden);
   return arr.length?arr:LABORES_BASE.map((x,i)=>({id:'',n:x.n,u:x.u,orden:i}));
@@ -1585,8 +1611,16 @@ function chequearMigracionLt(){
     const extra=[...new Set(Object.values(lotes).map(l=>l.labor).filter(x=>x&&x!==NOMBRE_VIEJO_COSECHA&&!LABORES_BASE.some(b=>b.n===x)))];
     extra.forEach((x,i)=>{up['tiposLabor/tlx'+(i+1)]={n:x,u:'ha',orden:100+i};});
   }
+  // cultivo: pasar desde observaciones a los precios que aún no lo tienen
+  let nc=0;
+  Object.entries(preciosLab).forEach(([id,p])=>{
+    if(p.cultivo!==undefined)return;
+    const c=cultivoDesdeObs(p.obs);
+    up['preciosLab/'+id+'/cultivo']=c;
+    if(c){nc++;up['preciosLab/'+id+'/obs']='';}
+  });
   if(Object.keys(up).length){
-    db.ref().update(up).then(()=>{if(n)toast(`${n} registros renombrados a "Cosecha"`);}).catch(()=>{});
+    db.ref().update(up).then(()=>{if(n)toast(`${n} registros renombrados a "Cosecha"`);else if(nc)toast(`Cultivo asignado a ${nc} precios desde sus observaciones`);}).catch(()=>{});
   }
 }
 function num2(n){n=Number(n)||0;return n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2});}
@@ -1876,7 +1910,7 @@ function renderPrecios(){
   if(!arr.length){cont.innerHTML=vacio('💲','Todavía no cargaste precios');return;}
   cont.innerHTML=arr.map(([id,p])=>`<div class="registro precio">
       <div class="reg-info">
-        <div class="reg-top"><span class="etiqueta et-fact">Precio</span><span class="reg-titulo">${p.labor}</span></div>
+        <div class="reg-top"><span class="etiqueta et-fact">Precio</span><span class="reg-titulo">${p.labor}</span>${p.cultivo?`<span class="etiqueta et-labor">🌱 ${p.cultivo}</span>`:''}</div>
         <div class="reg-meta">📅 ${fechaLinda(p.fecha)}${p.rinde?` · 🌽 Rinde ${num2(p.rinde)} tn/ha`:''}${p.obs?' · 📝 '+p.obs:''}</div>
         <div class="reg-acc"><button class="icono-btn" onclick="abrirModalPrecio('${id}')">✏️</button><button class="icono-btn" onclick="borrarPrecio('${id}')">🗑️</button></div>
       </div>
@@ -1897,6 +1931,7 @@ function abrirModalPrecio(id){
   $('pr-labor').value=p?p.labor:listaLabores()[0].n;
   $('pr-importe').value=p?p.importe:'';
   $('pr-rinde').value=p&&p.rinde?p.rinde:'';
+  $('pr-cultivo').value=p?p.cultivo||'':'';
   $('pr-obs').value=p?p.obs||'':'';
   ajustarPrecioForm();
   abrir('modal-precio');
@@ -1905,7 +1940,7 @@ function guardarPrecio(){
   const fecha=$('pr-fecha').value, importe=parseFloat($('pr-importe').value)||0;
   if(!fecha){toast('Poné la fecha');return;}
   if(!importe){toast('Poné el importe');return;}
-  const obj={fecha,labor:$('pr-labor').value,importe,obs:$('pr-obs').value.trim()};
+  const obj={fecha,labor:$('pr-labor').value,importe,cultivo:normalizarCultivo($('pr-cultivo').value),obs:$('pr-obs').value.trim()};
   if(esCosecha(obj.labor)&&$('pr-rinde').value)obj.rinde=parseFloat($('pr-rinde').value)||0;
   guardar('preciosLab/'+($('pr-id').value||uid()),obj,'Precio guardado');
   cerrar('modal-precio');
@@ -2037,13 +2072,17 @@ function llenarCmpLabores(){
   const v=s.value;
   const labs=[...new Set(Object.values(preciosLab).map(p=>p.labor))].sort();
   s.innerHTML='<option value="">Todas</option>'+labs.map(l=>`<option>${l}</option>`).join('');
-  s.value=v; llenarCmpPrecios();
+  s.value=v;
+  const sc=$('cmp-cultivo'); const vc=sc.value;
+  const cults=[...new Set(Object.values(preciosLab).map(p=>p.cultivo).filter(Boolean))].sort();
+  sc.innerHTML='<option value="">Todos</option>'+cults.map(c=>`<option>${c}</option>`).join('');
+  sc.value=vc; llenarCmpPrecios();
 }
 function llenarCmpPrecios(){
   const s=$('cmp-precio'); if(!s)return;
-  const fl=$('cmp-labor').value;
-  const arr=Object.entries(preciosLab).filter(([id,p])=>!fl||p.labor===fl).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
-  s.innerHTML=arr.length?arr.map(([id,p])=>`<option value="${id}">${fechaLinda(p.fecha)} · ${p.labor} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.obs?' · '+p.obs:''}</option>`).join(''):'<option value="">No hay precios cargados</option>';
+  const fl=$('cmp-labor').value, fc=$('cmp-cultivo').value;
+  const arr=Object.entries(preciosLab).filter(([id,p])=>(!fl||p.labor===fl)&&(!fc||p.cultivo===fc)).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+  s.innerHTML=arr.length?arr.map(([id,p])=>`<option value="${id}">${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.obs?' · '+p.obs:''}</option>`).join(''):'<option value="">No hay precios con ese filtro</option>';
 }
 function agregarCmp(){
   const id=$('cmp-precio').value; if(!id){toast('Elegí un precio del historial');return;}
@@ -2083,7 +2122,8 @@ function calcularPrecios(){
     // --- tabla automática: último precio de cada labor ---
     const filas=labs.sort().map(lab=>{
       const hist=Object.values(preciosLab).filter(p=>p.labor===lab).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-      return filaCalc(hist[hist.length-1],F,tcF,`<b>${lab}</b>`);
+      const ul=hist[hist.length-1];
+      return filaCalc(ul,F,tcF,`<b>${lab}</b>${ul.cultivo?`<span class="chico" style="color:var(--campo);font-weight:700">🌱 ${ul.cultivo}</span>`:''}`);
     }).join('');
     out.innerHTML=`<div class="tabla-wrap"><table class="tabla-calc">${CABECERA_CALC('Labor (último precio)')}<tbody>${filas}</tbody></table></div>
       <div class="nota-calc">📌 <b>Al ${fechaLinda(F)}.</b> A) actualiza por inflación mensual INDEC${ipc?` (último dato: ${nombreMes(ipc.fecha.slice(0,7))}, ${ipc.valor}%)`:''}.
@@ -2093,7 +2133,7 @@ function calcularPrecios(){
     calcSel=calcSel.filter(id=>preciosLab[id]);
     if(calcSel.length){
       const fc=calcSel.map(id=>{const u=preciosLab[id];
-        return filaCalc(u,F,tcF,`<b>${u.labor}</b>${u.obs?`<span class="chico" style="color:var(--campo);font-weight:700">${u.obs}</span>`:''}`,
+        return filaCalc(u,F,tcF,`<b>${u.labor}</b>${u.cultivo?`<span class="chico" style="color:var(--campo);font-weight:700">🌱 ${u.cultivo}</span>`:''}${u.obs?`<span class="chico">${u.obs}</span>`:''}`,
           `<span class="chico"><a href="#" onclick="quitarCmp('${id}');return false;" style="color:var(--rojo)">✕ quitar</a></span>`);}).join('');
       cmp.innerHTML=`<h3 style="margin:16px 0 8px;font-size:16px">🔎 Comparativo · precios elegidos del historial</h3>
         <div class="tabla-wrap"><table class="tabla-calc">${CABECERA_CALC('Labor · cultivo / detalle')}<tbody>${fc}</tbody></table></div>`;

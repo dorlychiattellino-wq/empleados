@@ -202,6 +202,36 @@
     .item-gan .monto-gan{flex:1}
   }
   .et-gan{background:#e7f0fa;color:#1c4c7c}
+  /* ---------- LOTES Y LABORES ---------- */
+  .et-plan-b{background:#fbe9c9;color:#8a5a00}
+  .et-plan-g{background:#e3efe4;color:#2f5d34}
+  .et-plan-p{background:#ece7f5;color:#4a3b7c}
+  .et-sf{background:#fde2e2;color:#b23a3a}
+  .et-fact{background:#e3efe4;color:#2f5d34}
+  .subpills{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px}
+  .subpills button{flex:0 0 auto;background:#fff;border:1px solid var(--gris-cl);border-radius:10px;
+    padding:9px 14px;font-size:13px;font-weight:700;color:var(--tinta);cursor:pointer;font-family:var(--body)}
+  .subpills button.activa{background:var(--campo-osc);color:#fff;border-color:var(--campo-osc)}
+  .pest.bern{background:#c98a1e;color:#fff;border-color:#c98a1e}
+  .pest.bern.activa{background:#8a5a00;border-color:#8a5a00}
+  .registro.lote{border-left-color:#c98a1e}
+  .registro.lote.gen{border-left-color:var(--campo)}
+  .registro.lote.pro{border-left-color:#6f5bb5}
+  .registro.precio{border-left-color:var(--campo)}
+  .registro.gasoil{border-left-color:#4a4a4a}
+  .registro.cobro{border-left-color:var(--verde-ok)}
+  .dif-mal{color:var(--rojo);font-weight:700}
+  .dif-ok{color:var(--verde-ok)}
+  .tabla-wrap{overflow-x:auto;background:var(--papel);border-radius:12px;box-shadow:var(--sombra);border:1px solid var(--gris-cl)}
+  .tabla-calc{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+  .tabla-calc th{background:var(--campo);color:#fff;text-align:left;padding:9px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  .tabla-calc td{padding:9px 10px;border-bottom:1px solid var(--gris-cl);vertical-align:top}
+  .tabla-calc td.n{text-align:right;white-space:nowrap;font-weight:700}
+  .tabla-calc td.prom{background:#f0f6ee;color:var(--campo-osc);font-size:15px}
+  .tabla-calc .chico{display:block;font-size:11px;color:var(--gris);font-weight:400}
+  .nota-calc{font-size:12.5px;color:var(--gris);background:#fff7e0;border:1px solid var(--trigo);border-radius:10px;padding:9px 12px;margin-top:12px}
+  .kpis3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+  @media(max-width:560px){.kpis3{grid-template-columns:1fr 1fr}.tabla-calc{min-width:560px}}
   .registro.gan{border-left-color:#3f7cb4}
 
   /* ---------- AUTOCOMPLETE ---------- */
@@ -307,6 +337,7 @@
     <button data-vista="pagos" onclick="irVista('pagos',this)">💵 Pagos</button>
     <button data-vista="cuentas" onclick="irVista('cuentas',this)">👥 Por trabajador</button>
     <button data-vista="dashboard" onclick="irVista('dashboard',this)">📊 Resumen</button>
+    <button data-vista="lotes" onclick="irVista('lotes',this)">🌾 Lotes y labores</button>
     <button data-vista="empleados" onclick="irVista('empleados',this)">⚙️ Trabajadores</button>
   </nav>
 
@@ -432,6 +463,85 @@
     </section>
 
     <!-- ====== VISTA EMPLEADOS ====== -->
+    <!-- ===== LOTES Y LABORES ===== -->
+    <section class="vista" id="v-lotes">
+      <h2 class="sec">Lotes y labores</h2>
+      <p class="sub">Registro de trabajos por establecimiento y lote, precios de labores, gasoil y calculadora de actualización.</p>
+      <div class="subpills">
+        <button class="activa" data-sub="registros" onclick="irSub('registros',this)">📋 Registros</button>
+        <button data-sub="precios" onclick="irSub('precios',this)">💲 Precios de labores</button>
+        <button data-sub="gasoil" onclick="irSub('gasoil',this)">⛽ Gasoil</button>
+        <button data-sub="calc" onclick="irSub('calc',this)">🧮 Calculadora</button>
+        <button data-sub="cobros" onclick="irSub('cobros',this)">🏦 Cobros</button>
+      </div>
+
+      <!-- REGISTROS -->
+      <div id="lt-registros">
+        <div class="pestanas" id="lt-planillas"></div>
+        <button class="btn" onclick="abrirModalLote()">+ Cargar labor por lote</button>
+        <details class="filtros" style="margin-top:12px">
+          <summary>🔍 Filtros</summary>
+          <div class="fila2">
+            <div class="campo-form"><label>Desde</label><input type="date" id="lf-desde"></div>
+            <div class="campo-form"><label>Hasta</label><input type="date" id="lf-hasta"></div>
+          </div>
+          <div class="fila2">
+            <div class="campo-form"><label>Establecimiento</label><select id="lf-estab"><option value="">Todos</option></select></div>
+            <div class="campo-form"><label>Labor</label><select id="lf-labor"><option value="">Todas</option></select></div>
+          </div>
+          <div class="fila2">
+            <div class="campo-form"><label>Estado</label><select id="lf-estado"><option value="">Todos</option><option value="FACT">Facturado</option><option value="S/F">Sin facturar</option></select></div>
+            <div class="campo-form"><label>Maquinista</label><select id="lf-maq"><option value="">Todos</option></select></div>
+          </div>
+          <div class="campo-form"><label>Buscar (lote / observaciones / N° factura)</label><input id="lf-txt" placeholder="Ej: 18 SUR"></div>
+          <div class="fila2">
+            <button class="btn peq linea" onclick="ltMostrar=120;render()">Aplicar</button>
+            <button class="btn peq gris" onclick="limpiarFiltros('lotes')">Limpiar</button>
+          </div>
+        </details>
+        <div id="lt-totales"></div>
+        <div id="lista-lotes"></div>
+      </div>
+
+      <!-- PRECIOS -->
+      <div id="lt-precios" style="display:none">
+        <p class="sub">Cargá el precio de cada labor cuando facturás. La calculadora toma el último precio de cada labor como base.</p>
+        <button class="btn" onclick="abrirModalPrecio()">+ Cargar precio de labor</button>
+        <div style="height:12px"></div>
+        <div id="lista-precios"></div>
+      </div>
+
+      <!-- GASOIL -->
+      <div id="lt-gasoil" style="display:none">
+        <p class="sub">Cargá cada compra de gasoil con su precio por litro. Sirve para actualizar precios según el costo del combustible.</p>
+        <button class="btn" onclick="abrirModalGasoil()">+ Cargar compra de gasoil</button>
+        <div style="height:12px"></div>
+        <div id="lista-gasoil"></div>
+      </div>
+
+      <!-- CALCULADORA -->
+      <div id="lt-calc" style="display:none">
+        <div class="tarjeta">
+          <div class="fila2">
+            <div class="campo-form"><label>Calcular precios al día</label><input type="date" id="calc-fecha"></div>
+            <div class="campo-form"><label>&nbsp;</label><button class="btn" onclick="calcularPrecios()">🧮 Calcular</button></div>
+          </div>
+          <p class="sub" id="calc-estado" style="margin:0">Usa inflación INDEC, dólar oficial BNA (venta) y tu historial de gasoil.</p>
+        </div>
+        <div id="calc-resultado"></div>
+      </div>
+
+      <!-- COBROS -->
+      <div id="lt-cobros" style="display:none">
+        <p class="sub">Pagos y anticipos recibidos de los clientes (establecimientos).</p>
+        <button class="btn" onclick="abrirModalCobro()">+ Cargar cobro</button>
+        <div style="height:12px"></div>
+        <div id="lt-cobros-tot"></div>
+        <div id="lista-cobros"></div>
+      </div>
+    </section>
+
+    <!-- ===== EMPLEADOS ===== -->
     <section class="vista" id="v-empleados">
       <h2 class="sec">Trabajadores</h2>
       <p class="sub">Cada trabajador tiene un porcentaje fijo (editable) que se usa al repartir las labores.</p>
@@ -440,7 +550,7 @@
 
       <div class="tarjeta" style="margin-top:22px;border-top:3px solid var(--tierra)">
         <h3 style="font-family:var(--display);margin:0 0 4px;font-size:17px">💾 Copia de seguridad</h3>
-        <p class="sub" style="margin-bottom:14px">Guardá un respaldo de todos los datos (trabajadores, pagos y labores) o restauralo desde un archivo.</p>
+        <p class="sub" style="margin-bottom:14px">Guardá un respaldo de todos los datos (trabajadores, pagos, labores, lotes, precios, gasoil y cobros) o restauralo desde un archivo.</p>
         <button class="btn" onclick="exportarBackup()">⬇️ Descargar backup (.json)</button>
         <div style="height:10px"></div>
         <button class="btn sec" onclick="document.getElementById('archivo-backup').click()">⬆️ Restaurar desde archivo</button>
@@ -572,12 +682,106 @@
   </div>
 </div>
 
+<!-- ===== MODAL LOTE ===== -->
+<div class="modal-bg" id="modal-lote">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-lote-titulo">Nueva labor por lote</h3><button class="modal-cerrar" onclick="cerrar('modal-lote')">×</button></div>
+    <input type="hidden" id="lo-id">
+    <div class="fila2">
+      <div class="campo-form"><label>Planilla</label><select id="lo-planilla"><option>BERNARDO</option><option>GENERAL</option><option>PROPIO</option></select></div>
+      <div class="campo-form"><label>Fecha</label><input type="date" id="lo-fecha"></div>
+    </div>
+    <div class="fila2">
+      <div class="campo-form autobox"><label>Establecimiento</label><input id="lo-estab" autocomplete="off" placeholder="Ej: LA VASCA" oninput="autocompletar(this,'estabs')" onfocus="autocompletar(this,'estabs')"><div class="sugerencias"></div></div>
+      <div class="campo-form autobox"><label>Lote</label><input id="lo-lote" autocomplete="off" placeholder="Ej: 18 SUR" oninput="autocompletar(this,'lotesNom')" onfocus="autocompletar(this,'lotesNom')"><div class="sugerencias"></div></div>
+    </div>
+    <div class="campo-form"><label>Labor</label><select id="lo-labor" onchange="difLote()"></select></div>
+    <div class="fila2">
+      <div class="campo-form"><label id="lo-cant-lbl">Cantidad (monitor)</label><input type="number" id="lo-cant" step="0.01" placeholder="0" oninput="difLote()"></div>
+      <div class="campo-form"><label>A facturar (pool)</label><input type="number" id="lo-fact" step="0.01" placeholder="Igual que monitor si vacío" oninput="difLote()"></div>
+    </div>
+    <div class="tarjeta" id="lo-dif-box" style="padding:10px 14px;background:#f7f6ef"><span class="sub" id="lo-dif-txt">Diferencia monitor − facturar: —</span></div>
+    <div class="fila2">
+      <div class="campo-form"><label>Estado</label><select id="lo-estado"><option value="S/F">Sin facturar</option><option value="FACT">Facturado</option></select></div>
+      <div class="campo-form"><label>Fecha factura</label><input type="date" id="lo-fechaFact"></div>
+    </div>
+    <div class="fila2">
+      <div class="campo-form"><label>N° factura</label><input id="lo-nroFact" placeholder="Ej: 00002-00000304"></div>
+      <div class="campo-form autobox"><label>Maquinista</label><input id="lo-maq" autocomplete="off" placeholder="Ej: NITO" oninput="autocompletar(this,'maqs')" onfocus="autocompletar(this,'maqs')"><div class="sugerencias"></div></div>
+    </div>
+    <div class="campo-form"><label>Observaciones</label><textarea id="lo-obs" placeholder="Ej: BOLSON 1 MAIZ"></textarea></div>
+    <button class="btn" onclick="guardarLote()">Guardar</button>
+    <button class="btn-cancelar" onclick="cerrar('modal-lote')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ===== MODAL PRECIO LABOR ===== -->
+<div class="modal-bg" id="modal-precio">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-precio-titulo">Nuevo precio de labor</h3><button class="modal-cerrar" onclick="cerrar('modal-precio')">×</button></div>
+    <input type="hidden" id="pr-id">
+    <div class="fila2">
+      <div class="campo-form"><label>Fecha</label><input type="date" id="pr-fecha"></div>
+      <div class="campo-form"><label>Labor</label><select id="pr-labor" onchange="ajustarPrecioForm()"></select></div>
+    </div>
+    <div class="fila2">
+      <div class="campo-form"><label id="pr-importe-lbl">Importe ($ por ha)</label><input type="number" id="pr-importe" step="0.01" placeholder="0"></div>
+      <div class="campo-form" id="pr-rinde-box" style="display:none"><label>Rinde (qq/ha)</label><input type="number" id="pr-rinde" step="0.1" placeholder="Ej: 35"></div>
+    </div>
+    <div class="campo-form"><label>Observaciones</label><input id="pr-obs" placeholder="Opcional (cliente, factura, etc.)"></div>
+    <button class="btn" onclick="guardarPrecio()">Guardar</button>
+    <button class="btn-cancelar" onclick="cerrar('modal-precio')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ===== MODAL GASOIL ===== -->
+<div class="modal-bg" id="modal-gasoil">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-gasoil-titulo">Nueva compra de gasoil</h3><button class="modal-cerrar" onclick="cerrar('modal-gasoil')">×</button></div>
+    <input type="hidden" id="ga-id">
+    <div class="fila2">
+      <div class="campo-form"><label>Fecha</label><input type="date" id="ga-fecha"></div>
+      <div class="campo-form autobox"><label>Marca</label><input id="ga-marca" autocomplete="off" placeholder="Ej: YPF" oninput="autocompletar(this,'marcasGasoil')" onfocus="autocompletar(this,'marcasGasoil')"><div class="sugerencias"></div></div>
+    </div>
+    <div class="fila2">
+      <div class="campo-form"><label>Precio por litro ($)</label><input type="number" id="ga-precio" step="0.01" placeholder="0"></div>
+      <div class="campo-form"><label>Litros (opcional)</label><input type="number" id="ga-litros" step="0.01" placeholder="0"></div>
+    </div>
+    <div class="campo-form"><label>Observaciones</label><input id="ga-obs" placeholder="Opcional"></div>
+    <button class="btn" onclick="guardarGasoil()">Guardar</button>
+    <button class="btn-cancelar" onclick="cerrar('modal-gasoil')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ===== MODAL COBRO ===== -->
+<div class="modal-bg" id="modal-cobro">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-cobro-titulo">Nuevo cobro</h3><button class="modal-cerrar" onclick="cerrar('modal-cobro')">×</button></div>
+    <input type="hidden" id="co-id">
+    <div class="fila2">
+      <div class="campo-form"><label>Fecha</label><input type="date" id="co-fecha"></div>
+      <div class="campo-form"><label>Planilla</label><select id="co-planilla"><option>GENERAL</option><option>BERNARDO</option><option>PROPIO</option></select></div>
+    </div>
+    <div class="campo-form autobox"><label>Establecimiento / cliente</label><input id="co-estab" autocomplete="off" placeholder="Ej: CUADRADO ENRIQUE" oninput="autocompletar(this,'estabs')" onfocus="autocompletar(this,'estabs')"><div class="sugerencias"></div></div>
+    <div class="fila2">
+      <div class="campo-form"><label>Concepto</label><select id="co-concepto"><option>ANTICIPO</option><option>PAGO PARCIAL</option><option>CANCELACIÓN</option></select></div>
+      <div class="campo-form"><label>Medio</label><select id="co-medio"><option>TRANSFERENCIA</option><option>CHEQUE</option><option>EFECTIVO</option><option>OTRO</option></select></div>
+    </div>
+    <div class="campo-form"><label>Importe ($)</label><input type="number" id="co-importe" step="0.01" placeholder="0"></div>
+    <div class="campo-form"><label>Observaciones</label><input id="co-obs" placeholder="Ej: Cheque N° ..."></div>
+    <button class="btn" onclick="guardarCobro()">Guardar</button>
+    <button class="btn-cancelar" onclick="cerrar('modal-cobro')">Cancelar</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 /* =================== ESTADO =================== */
 let db=null, firebaseOK=false;
 let empleados={}, pagos={}, labores={}, ganaderos={};
+let lotes={}, preciosLab={}, gasoil={}, cobros={};
+let ltPlanilla='__todas__', ltSub='registros', ltMostrar=120;
 let empSeleccionado='__todos__';
 let editLaborChips={};
 let editItems=[];
@@ -647,6 +851,10 @@ function escucharDatos(){
   db.ref('pagos').on('value',s=>{pagos=s.val()||{};render();mostrar();});
   db.ref('labores').on('value',s=>{labores=s.val()||{};render();mostrar();});
   db.ref('ganaderos').on('value',s=>{ganaderos=s.val()||{};render();mostrar();});
+  db.ref('lotes').on('value',s=>{lotes=s.val()||{};render();});
+  db.ref('preciosLab').on('value',s=>{preciosLab=s.val()||{};render();});
+  db.ref('gasoil').on('value',s=>{gasoil=s.val()||{};render();});
+  db.ref('cobros').on('value',s=>{cobros=s.val()||{};render();});
   setTimeout(mostrar,4000);
 }
 
@@ -886,6 +1094,10 @@ function valoresUsados(tipo){
     ACTIVIDADES_BASE.forEach(a=>set.add(a));
     Object.values(labores).forEach(l=>l.act&&set.add(l.act));
   }
+  if(tipo==='estabs'){Object.values(lotes).forEach(l=>l.estab&&set.add(l.estab));Object.values(cobros).forEach(c=>c.estab&&set.add(c.estab));}
+  if(tipo==='lotesNom'){const e=($('lo-estab')?$('lo-estab').value.trim().toUpperCase():'');Object.values(lotes).forEach(l=>{if(l.lote&&(!e||l.estab===e))set.add(l.lote);});}
+  if(tipo==='maqs')Object.values(lotes).forEach(l=>l.maq&&set.add(l.maq));
+  if(tipo==='marcasGasoil')Object.values(gasoil).forEach(g=>g.marca&&set.add(g.marca));
   if(tipo==='itemsgan'){
     ITEMS_GAN_BASE.forEach(a=>set.add(a));
     Object.values(ganaderos).forEach(g=>(g.items||[]).forEach(i=>i.desc&&set.add(i.desc)));
@@ -950,6 +1162,7 @@ function limpiarFiltros(t){
   if(t==='labor'){['fl-desde','fl-hasta','fl-txt'].forEach(i=>$(i).value='');$('fl-act').value='';$('fl-emp').value='';}
   else if(t==='pago'){['fp-desde','fp-hasta','fp-txt'].forEach(i=>$(i).value='');$('fp-cat').value='';$('fp-emp').value='';}
   else if(t==='cuenta'){['fc-desde','fc-hasta','fc-txt'].forEach(i=>$(i).value='');$('fc-tipo').value='';$('fc-act').value='';}
+  else if(t==='lotes'){['lf-desde','lf-hasta','lf-txt'].forEach(i=>$(i).value='');['lf-estab','lf-labor','lf-estado','lf-maq'].forEach(i=>$(i).value='');ltMostrar=120;}
   else if(t==='dash'){['fd-desde','fd-hasta'].forEach(i=>$(i).value='');$('fd-mes').value='';$('fd-emp').value='';}
   render();
 }
@@ -965,6 +1178,10 @@ function render(){
   renderEmpleados();
   renderPestanas();
   renderCuenta();
+  renderLotes();
+  renderPrecios();
+  renderGasoil();
+  renderCobros();
 }
 
 /* =================== DASHBOARD =================== */
@@ -1267,6 +1484,360 @@ function renderPestanas(){
   cont.innerHTML=html;
 }
 function seleccionarEmp(id){empSeleccionado=id;renderPestanas();renderCuenta();}
+
+
+/* =================== LOTES Y LABORES =================== */
+const LABORES_LOTE=[
+  {n:'Siembra simple/fert.',u:'ha'},{n:'Siembra doble/fert.',u:'ha'},{n:'Disco',u:'ha'},
+  {n:'Rolo triturador',u:'ha'},{n:'Labores varias / Cosecha',u:'ha'},
+  {n:'Embolsado',u:'tn'},{n:'Extracción cereal',u:'tn'}
+];
+function unidadLabor(n){const l=LABORES_LOTE.find(x=>x.n===n);return l?l.u:'ha';}
+function num2(n){n=Number(n)||0;return n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2});}
+function claseP(pl){return pl==='BERNARDO'?'et-plan-b':(pl==='PROPIO'?'et-plan-p':'et-plan-g');}
+function claseReg(pl){return pl==='BERNARDO'?'':(pl==='PROPIO'?' pro':' gen');}
+function esCosecha(l){return /cosecha/i.test(l||'');}
+
+function irSub(s,btn){
+  ltSub=s;
+  ['registros','precios','gasoil','calc','cobros'].forEach(x=>{$('lt-'+x).style.display=(x===s?'block':'none');});
+  document.querySelectorAll('.subpills button').forEach(b=>b.classList.remove('activa'));
+  if(btn)btn.classList.add('activa');
+  if(s==='calc'&&!$('calc-fecha').value)$('calc-fecha').value=hoy();
+}
+function llenarSelectLabores(sel,incluirVacio){
+  const extra=[...new Set(Object.values(lotes).map(l=>l.labor).filter(x=>x&&!LABORES_LOTE.some(b=>b.n===x)))];
+  sel.innerHTML=(incluirVacio?'<option value="">Todas</option>':'')+
+    LABORES_LOTE.map(l=>`<option>${l.n}</option>`).join('')+extra.map(x=>`<option>${x}</option>`).join('');
+}
+function llenarFiltrosLotes(){
+  const estabs=[...new Set(Object.values(lotes).map(l=>l.estab).filter(Boolean))].sort();
+  const maqs=[...new Set(Object.values(lotes).map(l=>l.maq).filter(Boolean))].sort();
+  const s1=$('lf-estab'),s2=$('lf-maq'),s3=$('lf-labor');
+  if(!s1)return;
+  const v1=s1.value,v2=s2.value,v3=s3.value;
+  s1.innerHTML='<option value="">Todos</option>'+estabs.map(e=>`<option>${e}</option>`).join('');
+  s2.innerHTML='<option value="">Todos</option>'+maqs.map(e=>`<option>${e}</option>`).join('');
+  llenarSelectLabores(s3,true);
+  s1.value=v1;s2.value=v2;s3.value=v3;
+}
+function seleccionarPlanilla(p){ltPlanilla=p;ltMostrar=120;renderLotes();}
+
+/* ---- registros ---- */
+function renderLotes(){
+  if(!$('lt-planillas'))return;
+  llenarFiltrosLotes();
+  // pills de planilla
+  const cnt={BERNARDO:0,GENERAL:0,PROPIO:0};
+  Object.values(lotes).forEach(l=>{if(cnt[l.planilla]!==undefined)cnt[l.planilla]++;});
+  $('lt-planillas').innerHTML=
+    `<div class="pest todos ${ltPlanilla==='__todas__'?'activa':''}" onclick="seleccionarPlanilla('__todas__')">Todas</div>`+
+    `<div class="pest bern ${ltPlanilla==='BERNARDO'?'activa':''}" onclick="seleccionarPlanilla('BERNARDO')">🐂 Bernardo (${cnt.BERNARDO})</div>`+
+    `<div class="pest ${ltPlanilla==='GENERAL'?'activa':''}" onclick="seleccionarPlanilla('GENERAL')">General (${cnt.GENERAL})</div>`+
+    `<div class="pest ${ltPlanilla==='PROPIO'?'activa':''}" onclick="seleccionarPlanilla('PROPIO')">Propio (${cnt.PROPIO})</div>`;
+
+  const d=$('lf-desde').value,h=$('lf-hasta').value,fe=$('lf-estab').value,fl=$('lf-labor').value,
+        fs=$('lf-estado').value,fm=$('lf-maq').value,ft=$('lf-txt').value.trim().toLowerCase();
+  let arr=Object.entries(lotes).filter(([id,l])=>{
+    if(ltPlanilla!=='__todas__'&&l.planilla!==ltPlanilla)return false;
+    if(!entreFechas(l.fecha,d,h))return false;
+    if(fe&&l.estab!==fe)return false;
+    if(fl&&l.labor!==fl)return false;
+    if(fs&&(l.estado||'S/F')!==fs)return false;
+    if(fm&&l.maq!==fm)return false;
+    if(ft&&!((l.lote||'')+' '+(l.obs||'')+' '+(l.nroFact||'')+' '+(l.estab||'')).toLowerCase().includes(ft))return false;
+    return true;
+  }).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+
+  // totales por labor
+  const porLab={}; let sf=0, sfCant=0, difAcum=0;
+  arr.forEach(([id,l])=>{
+    const u=unidadLabor(l.labor);
+    porLab[l.labor]=porLab[l.labor]||{cant:0,fact:0,u};
+    porLab[l.labor].cant+=(l.cant||0);
+    porLab[l.labor].fact+=(l.fact!=null?l.fact:(l.cant||0));
+    if((l.estado||'S/F')==='S/F'){sf++;sfCant+=(l.cant||0);}
+    if(l.fact!=null)difAcum+=(l.cant||0)-(l.fact||0);
+  });
+  $('lt-totales').innerHTML=arr.length?`
+    <div class="tarjeta" style="padding:12px 14px;margin-top:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;margin-bottom:6px">Totales de lo filtrado · ${arr.length} registros</div>
+      ${Object.entries(porLab).map(([lab,t])=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>${lab}</span><b>${num2(t.cant)} ${t.u}${Math.abs(t.cant-t.fact)>0.01?` <span class="sub" style="font-size:12px">(fact. ${num2(t.fact)})</span>`:''}</b></div>`).join('')}
+      <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:6px;border-top:1px solid var(--gris-cl);font-size:13.5px"><span>Sin facturar</span><b style="color:var(--rojo)">${sf} reg. · ${num2(sfCant)}</b></div>
+      ${Math.abs(difAcum)>0.01?`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>Diferencia monitor − facturado</span><b class="${difAcum>0?'dif-mal':'dif-ok'}">${num2(difAcum)}</b></div>`:''}
+    </div>`:'';
+
+  const cont=$('lista-lotes');
+  if(!arr.length){cont.innerHTML=vacio('🌾','No hay registros para mostrar');return;}
+  const vis=arr.slice(0,ltMostrar);
+  cont.innerHTML=vis.map(([id,l])=>{
+    const u=unidadLabor(l.labor);
+    const fact=l.fact!=null?l.fact:null;
+    const dif=fact!=null?(l.cant||0)-fact:0;
+    const sf=(l.estado||'S/F')==='S/F';
+    return `<div class="registro lote${claseReg(l.planilla)}">
+      <div class="reg-info">
+        <div class="reg-top">
+          <span class="etiqueta ${claseP(l.planilla)}">${l.planilla==='BERNARDO'?'Bernardo':l.planilla.toLowerCase()}</span>
+          <span class="etiqueta ${sf?'et-sf':'et-fact'}">${sf?'S/F':'FACT'}</span>
+          <span class="reg-titulo">${l.estab||'—'}${l.lote?' · Lote '+l.lote:''}</span>
+        </div>
+        <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🚜 ${l.labor}${l.maq?' · 👤 '+l.maq:''}</div>
+        <div class="reg-meta">${fact!=null&&Math.abs(dif)>0.005?`Monitor <b>${num2(l.cant)}</b> · A facturar <b>${num2(fact)}</b> · Dif. <span class="${dif>0?'dif-mal':'dif-ok'}">${num2(dif)}</span>`:''}${l.dif?` · Ajuste ${num2(l.dif)}`:''}${l.nroFact&&l.nroFact!=='0'?` · 🧾 ${l.nroFact}${l.fechaFact?' ('+fechaLinda(l.fechaFact)+')':''}`:''}</div>
+        ${l.obs?`<div class="reg-obs">${l.obs}</div>`:''}
+        <div class="reg-acc">
+          <button class="icono-btn" onclick="abrirModalLote('${id}')">✏️</button>
+          <button class="icono-btn" onclick="borrarLote('${id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="reg-monto">${num2(l.cant)} <span style="font-size:12px;font-weight:400">${u}</span></div>
+    </div>`;
+  }).join('')+(arr.length>ltMostrar?`<button class="btn linea" onclick="ltMostrar+=200;renderLotes()">Ver más (${arr.length-ltMostrar} restantes)</button>`:'');
+}
+function abrirModalLote(id){
+  $('lo-id').value=id||'';
+  llenarSelectLabores($('lo-labor'),false);
+  const l=id?lotes[id]:null;
+  $('modal-lote-titulo').textContent=l?'Editar labor por lote':'Nueva labor por lote';
+  $('lo-planilla').value=l?l.planilla:(ltPlanilla!=='__todas__'?ltPlanilla:'GENERAL');
+  $('lo-fecha').value=l?l.fecha:hoy();
+  $('lo-estab').value=l?l.estab||'':'';
+  $('lo-lote').value=l?l.lote||'':'';
+  $('lo-labor').value=l?l.labor:LABORES_LOTE[0].n;
+  $('lo-cant').value=l?(l.cant||''):'';
+  $('lo-fact').value=l&&l.fact!=null?l.fact:'';
+  $('lo-estado').value=l?(l.estado||'S/F'):'S/F';
+  $('lo-fechaFact').value=l?l.fechaFact||'':'';
+  $('lo-nroFact').value=l?l.nroFact||'':'';
+  $('lo-maq').value=l?l.maq||'':'';
+  $('lo-obs').value=l?l.obs||'':'';
+  difLote();
+  abrir('modal-lote');
+}
+function difLote(){
+  const c=parseFloat($('lo-cant').value)||0, f=$('lo-fact').value===''?null:parseFloat($('lo-fact').value)||0;
+  const u=unidadLabor($('lo-labor').value);
+  $('lo-cant-lbl').textContent=`Cantidad (monitor) en ${u}`;
+  $('lo-dif-txt').innerHTML=f==null?'Diferencia monitor − facturar: — (se factura lo del monitor)':
+    `Diferencia monitor − facturar: <b class="${(c-f)>0?'dif-mal':'dif-ok'}">${num2(c-f)} ${u}</b>`;
+}
+function guardarLote(){
+  const fecha=$('lo-fecha').value, estab=$('lo-estab').value.trim().toUpperCase();
+  if(!fecha){toast('Poné la fecha');return;}
+  if(!estab){toast('Poné el establecimiento');return;}
+  const cant=parseFloat($('lo-cant').value)||0;
+  if(!cant){toast('Poné la cantidad');return;}
+  const obj={planilla:$('lo-planilla').value,fecha,estab,lote:$('lo-lote').value.trim(),labor:$('lo-labor').value,
+    cant,estado:$('lo-estado').value,fechaFact:$('lo-fechaFact').value,nroFact:$('lo-nroFact').value.trim(),
+    maq:$('lo-maq').value.trim().toUpperCase(),obs:$('lo-obs').value.trim()};
+  if($('lo-fact').value!=='')obj.fact=parseFloat($('lo-fact').value)||0;
+  const id=$('lo-id').value||uid();
+  guardar('lotes/'+id,obj,'Labor guardada');
+  cerrar('modal-lote');
+}
+function borrarLote(id){if(confirm('¿Eliminar este registro?'))borrarRegistro('lotes/'+id,'Registro eliminado');}
+
+/* ---- precios de labores ---- */
+function renderPrecios(){
+  const cont=$('lista-precios'); if(!cont)return;
+  const arr=Object.entries(preciosLab).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+  if(!arr.length){cont.innerHTML=vacio('💲','Todavía no cargaste precios');return;}
+  cont.innerHTML=arr.map(([id,p])=>`<div class="registro precio">
+      <div class="reg-info">
+        <div class="reg-top"><span class="etiqueta et-fact">Precio</span><span class="reg-titulo">${p.labor}</span></div>
+        <div class="reg-meta">📅 ${fechaLinda(p.fecha)}${p.rinde?` · 🌽 Rinde ${num2(p.rinde)} qq/ha`:''}${p.obs?' · 📝 '+p.obs:''}</div>
+        <div class="reg-acc"><button class="icono-btn" onclick="abrirModalPrecio('${id}')">✏️</button><button class="icono-btn" onclick="borrarPrecio('${id}')">🗑️</button></div>
+      </div>
+      <div class="reg-monto">${plata(p.importe)}<span style="font-size:11px;font-weight:400">/${unidadLabor(p.labor)}</span></div>
+    </div>`).join('');
+}
+function ajustarPrecioForm(){
+  const l=$('pr-labor').value;
+  $('pr-importe-lbl').textContent=`Importe ($ por ${unidadLabor(l)})`;
+  $('pr-rinde-box').style.display=esCosecha(l)?'block':'none';
+}
+function abrirModalPrecio(id){
+  $('pr-id').value=id||'';
+  llenarSelectLabores($('pr-labor'),false);
+  const p=id?preciosLab[id]:null;
+  $('modal-precio-titulo').textContent=p?'Editar precio de labor':'Nuevo precio de labor';
+  $('pr-fecha').value=p?p.fecha:hoy();
+  $('pr-labor').value=p?p.labor:LABORES_LOTE[0].n;
+  $('pr-importe').value=p?p.importe:'';
+  $('pr-rinde').value=p&&p.rinde?p.rinde:'';
+  $('pr-obs').value=p?p.obs||'':'';
+  ajustarPrecioForm();
+  abrir('modal-precio');
+}
+function guardarPrecio(){
+  const fecha=$('pr-fecha').value, importe=parseFloat($('pr-importe').value)||0;
+  if(!fecha){toast('Poné la fecha');return;}
+  if(!importe){toast('Poné el importe');return;}
+  const obj={fecha,labor:$('pr-labor').value,importe,obs:$('pr-obs').value.trim()};
+  if(esCosecha(obj.labor)&&$('pr-rinde').value)obj.rinde=parseFloat($('pr-rinde').value)||0;
+  guardar('preciosLab/'+($('pr-id').value||uid()),obj,'Precio guardado');
+  cerrar('modal-precio');
+}
+function borrarPrecio(id){if(confirm('¿Eliminar este precio?'))borrarRegistro('preciosLab/'+id,'Precio eliminado');}
+
+/* ---- gasoil ---- */
+function renderGasoil(){
+  const cont=$('lista-gasoil'); if(!cont)return;
+  const arr=Object.entries(gasoil).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+  if(!arr.length){cont.innerHTML=vacio('⛽','Todavía no cargaste compras de gasoil');return;}
+  cont.innerHTML=arr.map(([id,g],i)=>{
+    const ant=arr[i+1]?arr[i+1][1].precio:null;
+    const var_=ant?((g.precio/ant-1)*100):null;
+    return `<div class="registro gasoil">
+      <div class="reg-info">
+        <div class="reg-top"><span class="etiqueta et-pago">Gasoil</span><span class="reg-titulo">${g.marca||'—'}</span></div>
+        <div class="reg-meta">📅 ${fechaLinda(g.fecha)}${g.litros?` · ${num2(g.litros)} L · total ${plata(g.precio*g.litros)}`:''}${var_!=null?` · <span class="${var_>0?'dif-mal':'dif-ok'}">${var_>0?'+':''}${var_.toFixed(1)}% vs. anterior</span>`:''}${g.obs?' · 📝 '+g.obs:''}</div>
+        <div class="reg-acc"><button class="icono-btn" onclick="abrirModalGasoil('${id}')">✏️</button><button class="icono-btn" onclick="borrarGasoil('${id}')">🗑️</button></div>
+      </div>
+      <div class="reg-monto">${plata(g.precio)}<span style="font-size:11px;font-weight:400">/L</span></div>
+    </div>`;}).join('');
+}
+function abrirModalGasoil(id){
+  $('ga-id').value=id||'';
+  const g=id?gasoil[id]:null;
+  $('modal-gasoil-titulo').textContent=g?'Editar compra de gasoil':'Nueva compra de gasoil';
+  $('ga-fecha').value=g?g.fecha:hoy(); $('ga-marca').value=g?g.marca||'':'';
+  $('ga-precio').value=g?g.precio:''; $('ga-litros').value=g&&g.litros?g.litros:''; $('ga-obs').value=g?g.obs||'':'';
+  abrir('modal-gasoil');
+}
+function guardarGasoil(){
+  const fecha=$('ga-fecha').value, precio=parseFloat($('ga-precio').value)||0;
+  if(!fecha){toast('Poné la fecha');return;}
+  if(!precio){toast('Poné el precio por litro');return;}
+  const obj={fecha,marca:capitalizar($('ga-marca').value),precio,obs:$('ga-obs').value.trim()};
+  if($('ga-litros').value)obj.litros=parseFloat($('ga-litros').value)||0;
+  guardar('gasoil/'+($('ga-id').value||uid()),obj,'Compra guardada');
+  cerrar('modal-gasoil');
+}
+function borrarGasoil(id){if(confirm('¿Eliminar esta compra?'))borrarRegistro('gasoil/'+id,'Compra eliminada');}
+
+/* ---- cobros ---- */
+function renderCobros(){
+  const cont=$('lista-cobros'); if(!cont)return;
+  const arr=Object.entries(cobros).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+  const tot=arr.reduce((s,[,c])=>s+(c.importe||0),0);
+  $('lt-cobros-tot').innerHTML=arr.length?`<div class="totales" style="grid-template-columns:1fr 1fr"><div class="total-card gana"><div class="et">Total cobrado</div><div class="num" style="color:var(--verde-ok)">${plata(tot)}</div></div><div class="total-card"><div class="et">Cobros</div><div class="num">${arr.length}</div></div></div>`:'';
+  if(!arr.length){cont.innerHTML=vacio('🏦','Todavía no cargaste cobros');return;}
+  cont.innerHTML=arr.map(([id,c])=>`<div class="registro cobro">
+      <div class="reg-info">
+        <div class="reg-top"><span class="etiqueta ${claseP(c.planilla)}">${(c.planilla||'').toLowerCase()}</span><span class="reg-titulo">${c.estab||'—'}</span></div>
+        <div class="reg-meta">📅 ${fechaLinda(c.fecha)} · ${c.concepto||''} · ${c.medio||''}${c.obs?' · 📝 '+c.obs:''}</div>
+        <div class="reg-acc"><button class="icono-btn" onclick="abrirModalCobro('${id}')">✏️</button><button class="icono-btn" onclick="borrarCobro('${id}')">🗑️</button></div>
+      </div>
+      <div class="reg-monto entra">+${plata(c.importe)}</div>
+    </div>`).join('');
+}
+function abrirModalCobro(id){
+  $('co-id').value=id||'';
+  const c=id?cobros[id]:null;
+  $('modal-cobro-titulo').textContent=c?'Editar cobro':'Nuevo cobro';
+  $('co-fecha').value=c?c.fecha:hoy(); $('co-planilla').value=c?c.planilla||'GENERAL':'GENERAL';
+  $('co-estab').value=c?c.estab||'':''; $('co-concepto').value=c?c.concepto||'ANTICIPO':'ANTICIPO';
+  $('co-medio').value=c?c.medio||'TRANSFERENCIA':'TRANSFERENCIA'; $('co-importe').value=c?c.importe:''; $('co-obs').value=c?c.obs||'':'';
+  abrir('modal-cobro');
+}
+function guardarCobro(){
+  const fecha=$('co-fecha').value, importe=parseFloat($('co-importe').value)||0, estab=$('co-estab').value.trim().toUpperCase();
+  if(!fecha){toast('Poné la fecha');return;}
+  if(!estab){toast('Poné el establecimiento');return;}
+  if(!importe){toast('Poné el importe');return;}
+  guardar('cobros/'+($('co-id').value||uid()),{fecha,planilla:$('co-planilla').value,estab,concepto:$('co-concepto').value,medio:$('co-medio').value,importe,obs:$('co-obs').value.trim()},'Cobro guardado');
+  cerrar('modal-cobro');
+}
+function borrarCobro(id){if(confirm('¿Eliminar este cobro?'))borrarRegistro('cobros/'+id,'Cobro eliminado');}
+
+/* ---- calculadora ---- */
+let ipcData=null, dolarData=null, dolarHoy=null, indicesCargando=null;
+function cargarIndices(){
+  if(ipcData&&dolarData)return Promise.resolve();
+  if(indicesCargando)return indicesCargando;
+  indicesCargando=Promise.all([
+    fetch('https://api.argentinadatos.com/v1/finanzas/indices/inflacion').then(r=>r.json()),
+    fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial').then(r=>r.json()),
+    fetch('https://dolarapi.com/v1/dolares/oficial').then(r=>r.json()).catch(()=>null)
+  ]).then(([i,d,hoyD])=>{
+    ipcData=(i||[]).filter(x=>x&&x.fecha&&x.valor!=null).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    dolarData=(d||[]).filter(x=>x&&x.fecha&&x.venta).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    dolarHoy=hoyD&&hoyD.venta?hoyD:null;
+    indicesCargando=null;
+  }).catch(e=>{indicesCargando=null;throw e;});
+  return indicesCargando;
+}
+function factorIPC(f0,f1){
+  // multiplica la inflación mensual de los meses posteriores a f0 hasta el mes de f1 (inclusive)
+  const m0=f0.slice(0,7), m1=f1.slice(0,7);
+  if(!ipcData||!ipcData.length)return {factor:1,hasta:null,parcial:false};
+  const ultimo=ipcData[ipcData.length-1].fecha.slice(0,7);
+  let factor=1, inv=false, a=m0, b=m1;
+  if(m1<m0){inv=true;a=m1;b=m0;}
+  ipcData.forEach(x=>{const m=x.fecha.slice(0,7);if(m>a&&m<=b)factor*=(1+x.valor/100);});
+  return {factor:inv?1/factor:factor,hasta:ultimo,parcial:b>ultimo};
+}
+function tcVenta(f){
+  if(!dolarData||!dolarData.length)return null;
+  if(f>=hoy()&&dolarHoy)return {venta:dolarHoy.venta,fecha:hoy(),hoy:true};
+  let r=null;
+  for(const x of dolarData){if(x.fecha<=f)r=x;else break;}
+  if(!r)r=dolarData[0];
+  return {venta:r.venta,fecha:r.fecha};
+}
+function gasoilCercano(f){ // más cercano en días a la fecha f
+  const arr=Object.values(gasoil).filter(g=>g.fecha&&g.precio).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(!arr.length)return null;
+  const t=new Date(f).getTime(); let mejor=arr[0], dm=Infinity;
+  arr.forEach(g=>{const d=Math.abs(new Date(g.fecha).getTime()-t);if(d<dm){dm=d;mejor=g;}});
+  return mejor;
+}
+function gasoilHasta(f){ // último con fecha <= f, si no hay el más antiguo
+  const arr=Object.values(gasoil).filter(g=>g.fecha&&g.precio).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(!arr.length)return null;
+  let r=null; for(const g of arr){if(g.fecha<=f)r=g;else break;}
+  return r||arr[0];
+}
+function calcularPrecios(){
+  const F=$('calc-fecha').value||hoy();
+  const est=$('calc-estado'), out=$('calc-resultado');
+  const labs=[...new Set(Object.values(preciosLab).map(p=>p.labor))];
+  if(!labs.length){out.innerHTML=vacio('💲','Primero cargá precios de labores en la pestaña "Precios de labores"');return;}
+  est.textContent='Consultando inflación y dólar…';
+  cargarIndices().then(()=>{
+    const ipc=ipcData.length?ipcData[ipcData.length-1]:null;
+    const tcF=tcVenta(F);
+    const filas=labs.sort().map(lab=>{
+      const hist=Object.values(preciosLab).filter(p=>p.labor===lab).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      const u=hist[hist.length-1]; const p0=u.importe, f0=u.fecha;
+      const ip=factorIPC(f0,F); const A=p0*ip.factor;
+      const tc0=tcVenta(f0); const B=(tc0&&tcF)?p0/tc0.venta*tcF.venta:null;
+      const g0=gasoilCercano(f0), gF=gasoilHasta(F);
+      const C=(g0&&gF&&g0!==gF)?p0*gF.precio/g0.precio:null;
+      const vals=[A,B,C].filter(x=>x!=null&&isFinite(x));
+      const prom=vals.length?vals.reduce((s,x)=>s+x,0)/vals.length:null;
+      const un=unidadLabor(lab);
+      return `<tr>
+        <td><b>${lab}</b>${u.rinde?`<span class="chico">rinde base ${num2(u.rinde)} qq/ha</span>`:''}</td>
+        <td class="n">${plata(p0)}/${un}<span class="chico">${fechaLinda(f0)}</span></td>
+        <td class="n">${plata(A)}<span class="chico">IPC ×${ip.factor.toFixed(3)}${ip.parcial?' (hasta '+nombreMes(ip.hasta)+')':''}</span></td>
+        <td class="n">${B!=null?plata(B):'—'}<span class="chico">${tc0&&tcF?`TC ${num2(tc0.venta)} → ${num2(tcF.venta)}`:'sin cotización'}</span></td>
+        <td class="n">${C!=null?plata(C):'—'}<span class="chico">${g0&&gF&&g0!==gF?`gasoil ${plata(g0.precio)} (${fechaLinda(g0.fecha)}) → ${plata(gF.precio)} (${fechaLinda(gF.fecha)})`:'faltan compras de gasoil'}</span></td>
+        <td class="n prom">${prom!=null?plata(prom):'—'}<span class="chico">${vals.length} de 3 métodos</span></td>
+      </tr>`;
+    }).join('');
+    out.innerHTML=`<div class="tabla-wrap"><table class="tabla-calc">
+      <thead><tr><th>Labor</th><th>Último precio</th><th>A) Inflación $</th><th>B) Dólar BNA</th><th>C) Gasoil</th><th>Promedio</th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+      <div class="nota-calc">📌 <b>Al ${fechaLinda(F)}.</b> A) actualiza por inflación mensual INDEC${ipc?` (último dato: ${nombreMes(ipc.fecha.slice(0,7))}, ${ipc.valor}%)`:''}.
+      B) dolariza el precio viejo al BNA venta de esa fecha y lo pesifica al BNA venta ${tcF&&tcF.hoy?'de hoy':'de la fecha elegida'}${tcF?` ($${num2(tcF.venta)})`:''}.
+      C) aplica la suba del gasoil entre la compra más cercana al último precio y la última compra hasta la fecha. El promedio es de los métodos disponibles.</div>`;
+    est.textContent=`Datos consultados ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}. `;
+    const b=document.createElement('a'); b.href='#'; b.textContent='Actualizar datos'; b.style.cssText='color:var(--campo);font-weight:700;margin-left:4px';
+    b.onclick=e=>{e.preventDefault();ipcData=null;dolarData=null;calcularPrecios();}; est.appendChild(b);
+  }).catch(()=>{est.textContent='No se pudieron consultar la inflación o el dólar. Revisá tu internet e intentá de nuevo.';out.innerHTML='';});
+}
 
 /* =================== IMPRIMIR / PDF =================== */
 const LOGO_PDF="data:image/png;base64,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";
@@ -1663,7 +2234,7 @@ function exportarBackup(){
     _app:'Empleados - El Mestizo',
     _version:1,
     _fecha:new Date().toISOString(),
-    empleados, pagos, labores, ganaderos
+    empleados, pagos, labores, ganaderos, lotes, preciosLab, gasoil, cobros
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -1683,13 +2254,17 @@ function importarBackup(input){
   reader.onload=e=>{
     try{
       const data=JSON.parse(e.target.result);
-      if(!data.empleados&&!data.pagos&&!data.labores&&!data.ganaderos){toast('El archivo no parece un backup válido');return;}
+      if(!data.empleados&&!data.pagos&&!data.labores&&!data.ganaderos&&!data.lotes&&!data.preciosLab&&!data.gasoil&&!data.cobros){toast('El archivo no parece un backup válido');return;}
       backupPendiente=data;
       const ne=Object.keys(data.empleados||{}).length;
       const np=Object.keys(data.pagos||{}).length;
       const nl=Object.keys(data.labores||{}).length;
       const ng=Object.keys(data.ganaderos||{}).length;
-      $('restaurar-info').textContent=`El archivo contiene ${ne} trabajadores, ${np} pagos, ${nl} labores y ${ng} servicios ganaderos`+(data._fecha?` (backup del ${fechaLinda(data._fecha.slice(0,10))})`:'')+'.';
+      const nlo=Object.keys(data.lotes||{}).length, npr=Object.keys(data.preciosLab||{}).length, nga=Object.keys(data.gasoil||{}).length, nco=Object.keys(data.cobros||{}).length;
+      const partes=[];
+      if(ne)partes.push(`${ne} trabajadores`); if(np)partes.push(`${np} pagos`); if(nl)partes.push(`${nl} labores`); if(ng)partes.push(`${ng} servicios ganaderos`);
+      if(nlo)partes.push(`${nlo} registros de lotes`); if(npr)partes.push(`${npr} precios`); if(nga)partes.push(`${nga} compras de gasoil`); if(nco)partes.push(`${nco} cobros`);
+      $('restaurar-info').textContent=`El archivo contiene ${partes.join(', ')}`+(data._fecha?` (backup del ${fechaLinda(data._fecha.slice(0,10))})`:'')+'. Al reemplazar, solo se tocan las secciones que trae el archivo.';
       abrir('modal-restaurar');
     }catch(err){toast('No pude leer el archivo. ¿Es un backup .json?');}
   };
@@ -1702,17 +2277,15 @@ function confirmarRestaurar(modo){
   if(!firebaseOK){toast('Sin base de datos conectada');return;}
   const b=backupPendiente;
   if(modo==='reemplazar'){
-    Promise.all([
-      db.ref('empleados').set(b.empleados||{}),
-      db.ref('pagos').set(b.pagos||{}),
-      db.ref('labores').set(b.labores||{}),
-      db.ref('ganaderos').set(b.ganaderos||{})
-    ]).then(()=>toast('Datos reemplazados desde el backup'))
+    // reemplaza SOLO las colecciones presentes en el archivo (no borra las que no trae)
+    const cols=['empleados','pagos','labores','ganaderos','lotes','preciosLab','gasoil','cobros'].filter(c=>b[c]);
+    Promise.all(cols.map(c=>db.ref(c).set(b[c]||{})))
+      .then(()=>toast('Datos reemplazados desde el backup'))
       .catch(()=>toast('Error al restaurar'));
   }else{ // combinar: solo IDs que no existen, sin pisar lo actual
     const updates={};
     let agregados=0;
-    [['empleados',empleados],['pagos',pagos],['labores',labores],['ganaderos',ganaderos]].forEach(([col,dest])=>{
+    [['empleados',empleados],['pagos',pagos],['labores',labores],['ganaderos',ganaderos],['lotes',lotes],['preciosLab',preciosLab],['gasoil',gasoil],['cobros',cobros]].forEach(([col,dest])=>{
       Object.entries(b[col]||{}).forEach(([id,val])=>{
         if(!(id in dest)){updates[col+'/'+id]=val;agregados++;}
       });

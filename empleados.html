@@ -2231,15 +2231,19 @@ function renderPreciosCliente(){
   box.style.display=$('cl-precios').checked?'block':'none';
   if(!$('cl-precios').checked)return;
   const o=datosCliente();
-  const labs=[...new Set(o.regs.map(l=>l.labor))].sort();
-  if(!labs.length){lista.innerHTML='<div class="sub">No hay labores con esos filtros.</div>';return;}
-  lista.innerHTML=labs.map(lab=>{
-    if(clPrecios[lab]===undefined){const s=precioLaborAl(lab,o.h||null);clPrecios[lab]=s?s.importe:'';}
-    const s=precioLaborAl(lab,o.h||null);
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-      <span style="flex:1 1 150px;font-size:13.5px"><b>${lab}</b><span class="chico" style="display:block;font-size:11px;color:var(--gris)">${s?'último cargado: '+plata(s.importe)+'/'+unidadLabor(lab)+' ('+fechaLinda(s.fecha)+')':'sin precio cargado'}</span></span>
-      <span style="font-size:12px;color:var(--gris)">$ por ${unidadLabor(lab)}</span>
-      <input type="number" step="0.01" class="fa-inp" style="width:130px" value="${clPrecios[lab]}" placeholder="0" oninput="clPrecios['${lab.replace(/'/g,"\\'")}']=this.value">
+  const grupos={};
+  o.regs.forEach(l=>{const k=claveLC(l);grupos[k]=grupos[k]||{labor:l.labor,cultivo:l.cultivo||'',n:0,cant:0};grupos[k].n++;grupos[k].cant+=(l.fact!=null?l.fact:(l.cant||0));});
+  const claves=Object.keys(grupos).sort();
+  if(!claves.length){lista.innerHTML='<div class="sub">Este cliente no tiene labores con esos filtros.</div>';return;}
+  lista.innerHTML=`<div class="sub" style="margin-bottom:6px;font-size:12px">${o.regs.length} registro(s) de <b>${o.cliente}</b> ${o.que==='sf'?'pendientes de facturar':''}</div>`+claves.map(k=>{
+    const g=grupos[k]; const u=unidadLabor(g.labor);
+    const s=precioLaborAl(g.labor,o.h||null,g.cultivo);
+    if(clPrecios[k]===undefined)clPrecios[k]=s?s.importe:'';
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;border-bottom:1px dashed var(--gris-cl);padding-bottom:5px">
+      <span style="flex:1 1 150px;font-size:13.5px"><b>${g.labor}</b>${g.cultivo?` <span style="color:var(--campo);font-weight:700">🌱 ${g.cultivo}</span>`:''}
+        <span class="chico" style="display:block;font-size:11px;color:var(--gris)">${g.n} registro(s) · ${num2(g.cant)} ${u} · ${s?'sugerido '+plata(s.importe)+'/'+u+' ('+fechaLinda(s.fecha)+(s.cultivo&&s.cultivo!==g.cultivo?', '+s.cultivo:'')+')':'sin precio cargado'}</span></span>
+      <span style="font-size:12px;color:var(--gris)">$ por ${u}</span>
+      <input type="number" step="0.01" class="fa-inp" style="width:130px" value="${clPrecios[k]}" placeholder="0" oninput="clPrecios['${k.replace(/'/g,"\\'")}']=this.value">
     </div>`;}).join('');
 }
 function llenarEstabsCliente(){
@@ -2247,12 +2251,15 @@ function llenarEstabsCliente(){
   const estabs=[...new Set(Object.values(lotes).filter(l=>l.planilla===pl).map(l=>l.estab).filter(Boolean))].sort();
   $('cl-estab').innerHTML=`<option value="">Todos los de ${pl==='BERNARDO'?'Bernardo':pl.toLowerCase()}</option>`+estabs.map(e=>`<option>${e}</option>`).join('');
 }
-function precioLaborAl(labor,hasta){
-  const arr=Object.values(preciosLab).filter(p=>p.labor===labor).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  if(!arr.length)return null;
+function precioLaborAl(labor,hasta,cultivo){
+  const todos=Object.values(preciosLab).filter(p=>p.labor===labor).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(!todos.length)return null;
+  const conCult=cultivo?todos.filter(p=>(p.cultivo||'')===cultivo):[];
+  const arr=conCult.length?conCult:todos;
   let r=null; for(const p of arr){if(!hasta||p.fecha<=hasta)r=p;}
   return r||arr[arr.length-1];
 }
+function claveLC(l){return l.labor+(l.cultivo?' · '+l.cultivo:'');}
 function datosCliente(){
   const pl=$('cl-planilla').value, es=$('cl-estab').value, d=$('cl-desde').value, h=$('cl-hasta').value, que=$('cl-que').value;
   const conPrecios=$('cl-precios').checked, conPagos=$('cl-pagos').checked, conObs=$('cl-obs').checked, nota=$('cl-nota').value.trim();
@@ -2266,7 +2273,7 @@ function armarHTMLCliente(){
   const o=datosCliente();
   if(!o.regs.length&&!o.cob.length){toast('No hay labores ni pagos para ese cliente con esos filtros');return null;}
   if(o.conPrecios){
-    const faltan=[...new Set(o.regs.map(l=>l.labor))].filter(lab=>!(parseFloat(clPrecios[lab])>0));
+    const faltan=[...new Set(o.regs.map(claveLC))].filter(k=>!(parseFloat(clPrecios[k])>0));
     if(faltan.length&&!confirm(`Estas labores no tienen precio cargado y saldrán sin importe:\n• ${faltan.join('\n• ')}\n\n¿Generar igual?`))return null;
   }
   const f=new Date();
@@ -2278,10 +2285,10 @@ function armarHTMLCliente(){
   let total=0; const porLab={};
   const filas=o.regs.map(l=>{
     const u=unidadLabor(l.labor); const cant=l.fact!=null?l.fact:(l.cant||0);
-    const pv=o.conPrecios?parseFloat(clPrecios[l.labor]):NaN;
+    const pv=o.conPrecios?parseFloat(clPrecios[claveLC(l)]):NaN;
     const pr=(o.conPrecios&&!isNaN(pv)&&pv>0)?{importe:pv}:null;
     const imp=pr?cant*pr.importe:null; if(imp!=null)total+=imp;
-    porLab[l.labor]=porLab[l.labor]||{cant:0,imp:0,u}; porLab[l.labor].cant+=cant; porLab[l.labor].imp+=(imp||0);
+    const kl=claveLC(l); porLab[kl]=porLab[kl]||{cant:0,imp:0,u}; porLab[kl].cant+=cant; porLab[kl].imp+=(imp||0);
     const sf=(l.estado||'S/F')==='S/F';
     return `<tr>
       <td>${fechaLinda(l.fecha)}</td>

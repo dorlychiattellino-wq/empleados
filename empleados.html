@@ -249,6 +249,13 @@
     padding:0 18px 28px;max-height:90vh;overflow-y:auto;animation:sube .25s ease;position:relative}
   @media(min-width:560px){.modal-bg{align-items:center}.modal{border-radius:18px}}
   @keyframes sube{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
+  .modal.ancho{max-width:980px}
+  .tabla-fac{min-width:720px}
+  .tabla-fac td{padding:7px 8px}
+  .fa-inp{width:105px;padding:7px 8px;border:1px solid var(--gris-cl);border-radius:8px;text-align:right;font-family:var(--body);font-size:14px}
+  .fa-inp.alerta{border-color:var(--rojo);background:#fff3f3}
+  tr.fa-off td{opacity:.45}
+  .fa-check{width:18px;height:18px;cursor:pointer}
   .modal-head{position:sticky;top:0;background:var(--crema);display:flex;align-items:center;
     justify-content:space-between;gap:10px;padding:18px 0 12px;margin-bottom:4px;z-index:6;
     border-bottom:1px solid var(--gris-cl)}
@@ -478,7 +485,10 @@
       <!-- REGISTROS -->
       <div id="lt-registros">
         <div class="pestanas" id="lt-planillas"></div>
-        <button class="btn" onclick="abrirModalLote()">+ Cargar labor por lote</button>
+        <div class="fila2">
+          <button class="btn" onclick="abrirModalLote()">+ Cargar labor por lote</button>
+          <button class="btn sec" onclick="abrirModalFac()">🧾 Facturar pendientes</button>
+        </div>
         <details class="filtros" style="margin-top:12px">
           <summary>🔍 Filtros</summary>
           <div class="fila2">
@@ -771,6 +781,31 @@
     <div class="campo-form"><label>Observaciones</label><input id="co-obs" placeholder="Ej: Cheque N° ..."></div>
     <button class="btn" onclick="guardarCobro()">Guardar</button>
     <button class="btn-cancelar" onclick="cerrar('modal-cobro')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ===== MODAL FACTURAR PENDIENTES ===== -->
+<div class="modal-bg" id="modal-fac">
+  <div class="modal ancho">
+    <div class="modal-head"><h3>🧾 Facturar pendientes</h3><button class="modal-cerrar" onclick="cerrar('modal-fac')">×</button></div>
+    <p class="sub" style="margin-top:0">Cargá en la tabla las cantidades que te pasan para facturar, marcá los registros que van en una misma factura y facturalos de una vez. Repetí para la siguiente factura.</p>
+    <div class="fila2">
+      <div class="campo-form"><label>Planilla</label><select id="fa-planilla" onchange="renderFac()"><option value="">Todas</option><option>BERNARDO</option><option>GENERAL</option><option>PROPIO</option></select></div>
+      <div class="campo-form"><label>Establecimiento</label><select id="fa-estab" onchange="renderFac()"></select></div>
+    </div>
+    <div class="fila2">
+      <div class="campo-form"><label>Labor</label><select id="fa-labor" onchange="renderFac()"></select></div>
+      <div class="campo-form"><label>Marcar</label><div class="fila2"><button class="btn peq linea" onclick="facTodos(true)">Todos</button><button class="btn peq gris" onclick="facTodos(false)">Ninguno</button></div></div>
+    </div>
+    <div class="tabla-wrap"><table class="tabla-calc tabla-fac" id="fa-tabla"></table></div>
+    <div id="fa-resumen" class="tarjeta" style="margin-top:10px;padding:10px 14px"></div>
+    <div class="fila2">
+      <div class="campo-form"><label>N° de factura</label><input id="fa-nro" placeholder="Ej: 00002-00000310"></div>
+      <div class="campo-form"><label>Fecha de factura</label><input type="date" id="fa-fecha"></div>
+    </div>
+    <button class="btn" onclick="facturarSeleccion()">🧾 Facturar los marcados</button>
+    <button class="btn sec" onclick="guardarCantidadesFac()">💾 Solo guardar cantidades (siguen sin facturar)</button>
+    <button class="btn-cancelar" onclick="cerrar('modal-fac')">Cerrar</button>
   </div>
 </div>
 
@@ -1532,7 +1567,7 @@ function renderLotes(){
   Object.values(lotes).forEach(l=>{if(cnt[l.planilla]!==undefined)cnt[l.planilla]++;});
   $('lt-planillas').innerHTML=
     `<div class="pest todos ${ltPlanilla==='__todas__'?'activa':''}" onclick="seleccionarPlanilla('__todas__')">Todas</div>`+
-    `<div class="pest bern ${ltPlanilla==='BERNARDO'?'activa':''}" onclick="seleccionarPlanilla('BERNARDO')">🐂 Bernardo (${cnt.BERNARDO})</div>`+
+    `<div class="pest bern ${ltPlanilla==='BERNARDO'?'activa':''}" onclick="seleccionarPlanilla('BERNARDO')">🌱 Bernardo (${cnt.BERNARDO})</div>`+
     `<div class="pest ${ltPlanilla==='GENERAL'?'activa':''}" onclick="seleccionarPlanilla('GENERAL')">General (${cnt.GENERAL})</div>`+
     `<div class="pest ${ltPlanilla==='PROPIO'?'activa':''}" onclick="seleccionarPlanilla('PROPIO')">Propio (${cnt.PROPIO})</div>`;
 
@@ -1636,6 +1671,88 @@ function guardarLote(){
   cerrar('modal-lote');
 }
 function borrarLote(id){if(confirm('¿Eliminar este registro?'))borrarRegistro('lotes/'+id,'Registro eliminado');}
+
+
+/* ---- facturación en lote ---- */
+let facSel={}, facVals={};
+function facPendientes(){
+  const pl=$('fa-planilla').value, es=$('fa-estab').value, la=$('fa-labor').value;
+  return Object.entries(lotes).filter(([id,l])=>(l.estado||'S/F')==='S/F'&&(!pl||l.planilla===pl)&&(!es||l.estab===es)&&(!la||l.labor===la))
+    .sort((a,b)=>(a[1].estab||'').localeCompare(b[1].estab||'')||(a[1].fecha||'').localeCompare(b[1].fecha||''));
+}
+function facVal(id,l){return facVals[id]!==undefined?facVals[id]:(l.fact!=null?l.fact:(l.cant||0));}
+function abrirModalFac(){
+  facSel={}; facVals={};
+  $('fa-planilla').value=ltPlanilla==='__todas__'?'':ltPlanilla;
+  const estabs=[...new Set(Object.values(lotes).filter(l=>(l.estado||'S/F')==='S/F').map(l=>l.estab).filter(Boolean))].sort();
+  $('fa-estab').innerHTML='<option value="">Todos</option>'+estabs.map(e=>`<option>${e}</option>`).join('');
+  llenarSelectLabores($('fa-labor'),true);
+  $('fa-fecha').value=hoy(); $('fa-nro').value='';
+  facPendientes().forEach(([id])=>facSel[id]=true);
+  renderFac(); abrir('modal-fac');
+}
+function facTodos(v){facPendientes().forEach(([id])=>{facSel[id]=v;});renderFac();}
+function renderFac(){
+  const arr=facPendientes(), t=$('fa-tabla');
+  if(!arr.length){t.innerHTML='<tr><td style="padding:22px;text-align:center;color:var(--gris)">No hay registros sin facturar con ese filtro 🎉</td></tr>';$('fa-resumen').innerHTML='';return;}
+  t.innerHTML=`<thead><tr><th></th><th>Fecha</th><th>Estab. / Lote</th><th>Labor</th><th>Monitor</th><th>A facturar</th><th>Dif.</th></tr></thead><tbody>`+
+    arr.map(([id,l])=>{
+      const v=parseFloat(facVal(id,l))||0, dif=(l.cant||0)-v, al=Math.abs(dif)>=5;
+      return `<tr id="fa-tr-${id}" class="${facSel[id]?'':'fa-off'}">
+        <td><input type="checkbox" class="fa-check" ${facSel[id]?'checked':''} onchange="facSel['${id}']=this.checked;$('fa-tr-${id}').className=this.checked?'':'fa-off';renderFacResumen()"></td>
+        <td style="white-space:nowrap">${fechaLinda(l.fecha)}</td>
+        <td><b>${l.estab||'—'}</b>${l.lote?'<span class="chico">Lote '+l.lote+'</span>':''}${l.obs?'<span class="chico">'+l.obs+'</span>':''}</td>
+        <td>${l.labor}</td>
+        <td class="n">${num2(l.cant)} <span class="chico" style="display:inline">${unidadLabor(l.labor)}</span></td>
+        <td><input type="number" step="0.01" class="fa-inp ${al?'alerta':''}" value="${facVal(id,l)}" oninput="facVals['${id}']=this.value;facFila(this,'${id}')"></td>
+        <td class="n" id="fa-dif-${id}"><span class="${al?'dif-mal':'dif-ok'}">${al?'⚠ ':''}${num2(dif)}</span></td>
+      </tr>`;}).join('')+'</tbody>';
+  renderFacResumen();
+}
+function facFila(inp,id){
+  const l=lotes[id]; if(!l)return;
+  const v=parseFloat(inp.value)||0, dif=(l.cant||0)-v, al=Math.abs(dif)>=5;
+  inp.classList.toggle('alerta',al);
+  $('fa-dif-'+id).innerHTML=`<span class="${al?'dif-mal':'dif-ok'}">${al?'⚠ ':''}${num2(dif)}</span>`;
+  renderFacResumen();
+}
+function renderFacResumen(){
+  const arr=facPendientes().filter(([id])=>facSel[id]);
+  let m=0,f=0,al=0;
+  arr.forEach(([id,l])=>{const v=parseFloat(facVal(id,l))||0;m+=(l.cant||0);f+=v;if(Math.abs((l.cant||0)-v)>=5)al++;});
+  $('fa-resumen').innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:13.5px;align-items:center">
+    <span><b>${arr.length}</b> marcados</span><span>Monitor <b>${num2(m)}</b></span><span>A facturar <b>${num2(f)}</b></span>
+    <span>Dif. <b class="${Math.abs(m-f)>=5?'dif-mal':'dif-ok'}">${num2(m-f)}</b></span>
+    ${al?`<span class="dif-mal">⚠ ${al} con diferencia ≥ 5</span>`:''}</div>`;
+}
+function guardarVarios(updates,msg){
+  if(!firebaseOK){toast('Sin base de datos conectada');return;}
+  db.ref().update(updates).then(()=>toast(msg)).catch(()=>toast('Error al guardar'));
+}
+function guardarCantidadesFac(){
+  const arr=facPendientes().filter(([id])=>facSel[id]);
+  if(!arr.length){toast('No hay registros marcados');return;}
+  const up={}; arr.forEach(([id,l])=>{up['lotes/'+id+'/fact']=parseFloat(facVal(id,l))||0;});
+  guardarVarios(up,`Cantidades guardadas en ${arr.length} registros`);
+  facVals={}; setTimeout(renderFac,400);
+}
+function facturarSeleccion(){
+  const arr=facPendientes().filter(([id])=>facSel[id]);
+  if(!arr.length){toast('Marcá los registros a facturar');return;}
+  const nro=$('fa-nro').value.trim(), fe=$('fa-fecha').value;
+  if(!nro){toast('Poné el N° de factura');return;}
+  if(!fe){toast('Poné la fecha de factura');return;}
+  const alertas=arr.filter(([id,l])=>Math.abs((l.cant||0)-(parseFloat(facVal(id,l))||0))>=5);
+  if(alertas.length){
+    const det=alertas.map(([id,l])=>`• ${l.estab}${l.lote?' lote '+l.lote:''} (${l.labor}): monitor ${num2(l.cant)} / factura ${num2(facVal(id,l))}`).join('\n');
+    if(!confirm(`⚠ ${alertas.length} registro(s) con diferencia de 5 o más entre monitor y facturar:\n\n${det}\n\n¿Facturar igual?`))return;
+  }
+  const up={};
+  arr.forEach(([id,l])=>{up['lotes/'+id+'/fact']=parseFloat(facVal(id,l))||0;up['lotes/'+id+'/estado']='FACT';up['lotes/'+id+'/nroFact']=nro;up['lotes/'+id+'/fechaFact']=fe;});
+  guardarVarios(up,`${arr.length} registros facturados con la factura ${nro}`);
+  arr.forEach(([id])=>{delete facSel[id];delete facVals[id];});
+  setTimeout(renderFac,500);
+}
 
 /* ---- precios de labores ---- */
 function renderPrecios(){

@@ -489,6 +489,7 @@
           <button class="btn" onclick="abrirModalLote()">+ Cargar labor por lote</button>
           <button class="btn sec" onclick="abrirModalFac()">🧾 Facturar pendientes</button>
         </div>
+        <button class="btn peq linea" style="margin-top:8px" onclick="abrirModalTipos()">⚙️ Tipos de labor (agregar / editar / eliminar)</button>
         <details class="filtros" style="margin-top:12px">
           <summary>🔍 Filtros</summary>
           <div class="fila2">
@@ -809,13 +810,36 @@
   </div>
 </div>
 
+<!-- ===== MODAL TIPOS DE LABOR ===== -->
+<div class="modal-bg" id="modal-tipos">
+  <div class="modal">
+    <div class="modal-head"><h3>⚙️ Tipos de labor</h3><button class="modal-cerrar" onclick="cerrar('modal-tipos')">×</button></div>
+    <p class="sub" style="margin-top:0">Si renombrás una labor, se actualiza en todos los registros y precios que la usan.</p>
+    <div id="lista-tipos"></div>
+    <div class="tarjeta" style="margin-top:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;margin-bottom:8px" id="tp-titulo">Agregar labor</div>
+      <input type="hidden" id="tp-id">
+      <div class="fila2">
+        <div class="campo-form"><label>Nombre</label><input id="tp-nombre" placeholder="Ej: Pulverización"></div>
+        <div class="campo-form"><label>Unidad</label><select id="tp-unidad"><option value="ha">Hectáreas (ha)</option><option value="tn">Toneladas (tn)</option></select></div>
+      </div>
+      <div class="fila2">
+        <button class="btn peq" onclick="guardarTipo()">Guardar</button>
+        <button class="btn peq gris" onclick="limpiarTipoForm()">Cancelar edición</button>
+      </div>
+    </div>
+    <button class="btn-cancelar" onclick="cerrar('modal-tipos')">Cerrar</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 /* =================== ESTADO =================== */
 let db=null, firebaseOK=false;
 let empleados={}, pagos={}, labores={}, ganaderos={};
-let lotes={}, preciosLab={}, gasoil={}, cobros={};
+let lotes={}, preciosLab={}, gasoil={}, cobros={}, tiposLabor={};
+let cargadoLt={lotes:false,precios:false,tipos:false}, migracionLtHecha=false;
 let ltPlanilla='__todas__', ltSub='registros', ltMostrar=120;
 let empSeleccionado='__todos__';
 let editLaborChips={};
@@ -886,8 +910,9 @@ function escucharDatos(){
   db.ref('pagos').on('value',s=>{pagos=s.val()||{};render();mostrar();});
   db.ref('labores').on('value',s=>{labores=s.val()||{};render();mostrar();});
   db.ref('ganaderos').on('value',s=>{ganaderos=s.val()||{};render();mostrar();});
-  db.ref('lotes').on('value',s=>{lotes=s.val()||{};render();});
-  db.ref('preciosLab').on('value',s=>{preciosLab=s.val()||{};render();});
+  db.ref('lotes').on('value',s=>{lotes=s.val()||{};cargadoLt.lotes=true;render();chequearMigracionLt();});
+  db.ref('preciosLab').on('value',s=>{preciosLab=s.val()||{};cargadoLt.precios=true;render();chequearMigracionLt();});
+  db.ref('tiposLabor').on('value',s=>{tiposLabor=s.val()||{};cargadoLt.tipos=true;render();chequearMigracionLt();});
   db.ref('gasoil').on('value',s=>{gasoil=s.val()||{};render();});
   db.ref('cobros').on('value',s=>{cobros=s.val()||{};render();});
   setTimeout(mostrar,4000);
@@ -1522,12 +1547,34 @@ function seleccionarEmp(id){empSeleccionado=id;renderPestanas();renderCuenta();}
 
 
 /* =================== LOTES Y LABORES =================== */
-const LABORES_LOTE=[
+const LABORES_BASE=[
   {n:'Siembra simple/fert.',u:'ha'},{n:'Siembra doble/fert.',u:'ha'},{n:'Disco',u:'ha'},
-  {n:'Rolo triturador',u:'ha'},{n:'Labores varias / Cosecha',u:'ha'},
+  {n:'Rolo triturador',u:'ha'},{n:'Cosecha',u:'ha'},
   {n:'Embolsado',u:'tn'},{n:'Extracción cereal',u:'tn'}
 ];
-function unidadLabor(n){const l=LABORES_LOTE.find(x=>x.n===n);return l?l.u:'ha';}
+const NOMBRE_VIEJO_COSECHA='Labores varias / Cosecha';
+function listaLabores(){
+  const arr=Object.entries(tiposLabor).map(([id,t])=>({id,n:t.n,u:t.u||'ha',orden:t.orden||0})).sort((a,b)=>a.orden-b.orden);
+  return arr.length?arr:LABORES_BASE.map((x,i)=>({id:'',n:x.n,u:x.u,orden:i}));
+}
+function unidadLabor(n){const l=listaLabores().find(x=>x.n===n);return l?l.u:'ha';}
+/* migración automática (una sola vez): renombra la cosecha y crea los tipos editables */
+function chequearMigracionLt(){
+  if(migracionLtHecha||!firebaseOK||!(cargadoLt.lotes&&cargadoLt.precios&&cargadoLt.tipos))return;
+  migracionLtHecha=true;
+  const up={}; let n=0;
+  Object.entries(lotes).forEach(([id,l])=>{if(l.labor===NOMBRE_VIEJO_COSECHA){up['lotes/'+id+'/labor']='Cosecha';n++;}});
+  Object.entries(preciosLab).forEach(([id,p])=>{if(p.labor===NOMBRE_VIEJO_COSECHA){up['preciosLab/'+id+'/labor']='Cosecha';n++;}});
+  if(!Object.keys(tiposLabor).length){
+    LABORES_BASE.forEach((x,i)=>{up['tiposLabor/tl'+(i+1)]={n:x.n,u:x.u,orden:i};});
+    // tipos que existan en registros y no estén en la base
+    const extra=[...new Set(Object.values(lotes).map(l=>l.labor).filter(x=>x&&x!==NOMBRE_VIEJO_COSECHA&&!LABORES_BASE.some(b=>b.n===x)))];
+    extra.forEach((x,i)=>{up['tiposLabor/tlx'+(i+1)]={n:x,u:'ha',orden:100+i};});
+  }
+  if(Object.keys(up).length){
+    db.ref().update(up).then(()=>{if(n)toast(`${n} registros renombrados a "Cosecha"`);}).catch(()=>{});
+  }
+}
 function num2(n){n=Number(n)||0;return n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2});}
 function claseP(pl){return pl==='BERNARDO'?'et-plan-b':(pl==='PROPIO'?'et-plan-p':'et-plan-g');}
 function claseReg(pl){return pl==='BERNARDO'?'':(pl==='PROPIO'?' pro':' gen');}
@@ -1541,9 +1588,10 @@ function irSub(s,btn){
   if(s==='calc'&&!$('calc-fecha').value)$('calc-fecha').value=hoy();
 }
 function llenarSelectLabores(sel,incluirVacio){
-  const extra=[...new Set(Object.values(lotes).map(l=>l.labor).filter(x=>x&&!LABORES_LOTE.some(b=>b.n===x)))];
+  const base=listaLabores();
+  const extra=[...new Set(Object.values(lotes).map(l=>l.labor).filter(x=>x&&!base.some(b=>b.n===x)))];
   sel.innerHTML=(incluirVacio?'<option value="">Todas</option>':'')+
-    LABORES_LOTE.map(l=>`<option>${l.n}</option>`).join('')+extra.map(x=>`<option>${x}</option>`).join('');
+    base.map(l=>`<option>${l.n}</option>`).join('')+extra.map(x=>`<option>${x}</option>`).join('');
 }
 function llenarFiltrosLotes(){
   const estabs=[...new Set(Object.values(lotes).map(l=>l.estab).filter(Boolean))].sort();
@@ -1638,7 +1686,7 @@ function abrirModalLote(id){
   $('lo-fecha').value=l?l.fecha:hoy();
   $('lo-estab').value=l?l.estab||'':'';
   $('lo-lote').value=l?l.lote||'':'';
-  $('lo-labor').value=l?l.labor:LABORES_LOTE[0].n;
+  $('lo-labor').value=l?l.labor:listaLabores()[0].n;
   $('lo-cant').value=l?(l.cant||''):'';
   $('lo-fact').value=l&&l.fact!=null?l.fact:'';
   $('lo-estado').value=l?(l.estado||'S/F'):'S/F';
@@ -1754,6 +1802,59 @@ function facturarSeleccion(){
   setTimeout(renderFac,500);
 }
 
+
+/* ---- tipos de labor (editables) ---- */
+function usosDeLabor(n){
+  return Object.values(lotes).filter(l=>l.labor===n).length+Object.values(preciosLab).filter(p=>p.labor===n).length;
+}
+function abrirModalTipos(){limpiarTipoForm();renderTipos();abrir('modal-tipos');}
+function renderTipos(){
+  const cont=$('lista-tipos'); if(!cont)return;
+  const arr=listaLabores();
+  cont.innerHTML=arr.map(t=>`<div class="registro" style="padding:9px 12px">
+      <div class="reg-info"><div class="reg-top"><span class="reg-titulo">${t.n}</span><span class="etiqueta et-labor">${t.u}</span></div>
+        <div class="reg-meta">${usosDeLabor(t.n)} registro(s) la usan</div></div>
+      <div class="reg-acc" style="margin:0">
+        <button class="icono-btn" onclick="editarTipo('${t.id}')" ${t.id?'':'disabled title="Esperá a que se guarden los tipos"'}>✏️</button>
+        <button class="icono-btn" onclick="borrarTipo('${t.id}')" ${t.id?'':'disabled'}>🗑️</button>
+      </div></div>`).join('');
+}
+function limpiarTipoForm(){$('tp-id').value='';$('tp-nombre').value='';$('tp-unidad').value='ha';$('tp-titulo').textContent='Agregar labor';}
+function editarTipo(id){
+  const t=tiposLabor[id]; if(!t)return;
+  $('tp-id').value=id;$('tp-nombre').value=t.n;$('tp-unidad').value=t.u||'ha';$('tp-titulo').textContent='Editar labor';
+  $('tp-nombre').focus();
+}
+function guardarTipo(){
+  const id=$('tp-id').value, n=capitalizar($('tp-nombre').value), u=$('tp-unidad').value;
+  if(!n){toast('Poné el nombre de la labor');return;}
+  const dup=Object.entries(tiposLabor).find(([k,t])=>t.n.toLowerCase()===n.toLowerCase()&&k!==id);
+  if(dup){toast('Ya existe una labor con ese nombre');return;}
+  const up={};
+  if(id){
+    const viejo=tiposLabor[id].n;
+    up['tiposLabor/'+id]={n,u,orden:tiposLabor[id].orden||0};
+    if(viejo!==n){
+      let k=0;
+      Object.entries(lotes).forEach(([lid,l])=>{if(l.labor===viejo){up['lotes/'+lid+'/labor']=n;k++;}});
+      Object.entries(preciosLab).forEach(([pid,p])=>{if(p.labor===viejo){up['preciosLab/'+pid+'/labor']=n;k++;}});
+      if(k&&!confirm(`Se va a renombrar "${viejo}" → "${n}" en ${k} registro(s). ¿Continuar?`))return;
+    }
+  }else{
+    const orden=Math.max(0,...Object.values(tiposLabor).map(t=>t.orden||0))+1;
+    up['tiposLabor/'+uid()]={n,u,orden};
+  }
+  guardarVarios(up,id?'Labor actualizada':'Labor agregada');
+  limpiarTipoForm(); setTimeout(renderTipos,400);
+}
+function borrarTipo(id){
+  const t=tiposLabor[id]; if(!t)return;
+  const usos=usosDeLabor(t.n);
+  if(usos){toast(`No se puede eliminar: ${usos} registro(s) usan "${t.n}". Renombrala o reasignalos primero.`);return;}
+  if(!confirm(`¿Eliminar la labor "${t.n}"?`))return;
+  borrarRegistro('tiposLabor/'+id,'Labor eliminada'); setTimeout(renderTipos,400);
+}
+
 /* ---- precios de labores ---- */
 function renderPrecios(){
   const cont=$('lista-precios'); if(!cont)return;
@@ -1779,7 +1880,7 @@ function abrirModalPrecio(id){
   const p=id?preciosLab[id]:null;
   $('modal-precio-titulo').textContent=p?'Editar precio de labor':'Nuevo precio de labor';
   $('pr-fecha').value=p?p.fecha:hoy();
-  $('pr-labor').value=p?p.labor:LABORES_LOTE[0].n;
+  $('pr-labor').value=p?p.labor:listaLabores()[0].n;
   $('pr-importe').value=p?p.importe:'';
   $('pr-rinde').value=p&&p.rinde?p.rinde:'';
   $('pr-obs').value=p?p.obs||'':'';
@@ -2351,7 +2452,7 @@ function exportarBackup(){
     _app:'Empleados - El Mestizo',
     _version:1,
     _fecha:new Date().toISOString(),
-    empleados, pagos, labores, ganaderos, lotes, preciosLab, gasoil, cobros
+    empleados, pagos, labores, ganaderos, lotes, preciosLab, gasoil, cobros, tiposLabor
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -2395,14 +2496,14 @@ function confirmarRestaurar(modo){
   const b=backupPendiente;
   if(modo==='reemplazar'){
     // reemplaza SOLO las colecciones presentes en el archivo (no borra las que no trae)
-    const cols=['empleados','pagos','labores','ganaderos','lotes','preciosLab','gasoil','cobros'].filter(c=>b[c]);
+    const cols=['empleados','pagos','labores','ganaderos','lotes','preciosLab','gasoil','cobros','tiposLabor'].filter(c=>b[c]);
     Promise.all(cols.map(c=>db.ref(c).set(b[c]||{})))
       .then(()=>toast('Datos reemplazados desde el backup'))
       .catch(()=>toast('Error al restaurar'));
   }else{ // combinar: solo IDs que no existen, sin pisar lo actual
     const updates={};
     let agregados=0;
-    [['empleados',empleados],['pagos',pagos],['labores',labores],['ganaderos',ganaderos],['lotes',lotes],['preciosLab',preciosLab],['gasoil',gasoil],['cobros',cobros]].forEach(([col,dest])=>{
+    [['empleados',empleados],['pagos',pagos],['labores',labores],['ganaderos',ganaderos],['lotes',lotes],['preciosLab',preciosLab],['gasoil',gasoil],['cobros',cobros],['tiposLabor',tiposLabor]].forEach(([col,dest])=>{
       Object.entries(b[col]||{}).forEach(([id,val])=>{
         if(!(id in dest)){updates[col+'/'+id]=val;agregados++;}
       });

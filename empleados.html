@@ -737,7 +737,7 @@
     </div>
     <div class="fila2">
       <div class="campo-form"><label id="pr-importe-lbl">Importe ($ por ha)</label><input type="number" id="pr-importe" step="0.01" placeholder="0"></div>
-      <div class="campo-form" id="pr-rinde-box" style="display:none"><label>Rinde (qq/ha)</label><input type="number" id="pr-rinde" step="0.1" placeholder="Ej: 35"></div>
+      <div class="campo-form" id="pr-rinde-box" style="display:none"><label>Rinde (tn/ha)</label><input type="number" id="pr-rinde" step="0.1" placeholder="Ej: 7,1"></div>
     </div>
     <div class="campo-form"><label>Observaciones</label><input id="pr-obs" placeholder="Opcional (cliente, factura, etc.)"></div>
     <button class="btn" onclick="guardarPrecio()">Guardar</button>
@@ -1863,7 +1863,7 @@ function renderPrecios(){
   cont.innerHTML=arr.map(([id,p])=>`<div class="registro precio">
       <div class="reg-info">
         <div class="reg-top"><span class="etiqueta et-fact">Precio</span><span class="reg-titulo">${p.labor}</span></div>
-        <div class="reg-meta">📅 ${fechaLinda(p.fecha)}${p.rinde?` · 🌽 Rinde ${num2(p.rinde)} qq/ha`:''}${p.obs?' · 📝 '+p.obs:''}</div>
+        <div class="reg-meta">📅 ${fechaLinda(p.fecha)}${p.rinde?` · 🌽 Rinde ${num2(p.rinde)} tn/ha`:''}${p.obs?' · 📝 '+p.obs:''}</div>
         <div class="reg-acc"><button class="icono-btn" onclick="abrirModalPrecio('${id}')">✏️</button><button class="icono-btn" onclick="borrarPrecio('${id}')">🗑️</button></div>
       </div>
       <div class="reg-monto">${plata(p.importe)}<span style="font-size:11px;font-weight:400">/${unidadLabor(p.labor)}</span></div>
@@ -2037,7 +2037,7 @@ function calcularPrecios(){
       const prom=vals.length?vals.reduce((s,x)=>s+x,0)/vals.length:null;
       const un=unidadLabor(lab);
       return `<tr>
-        <td><b>${lab}</b>${u.rinde?`<span class="chico">rinde base ${num2(u.rinde)} qq/ha</span>`:''}</td>
+        <td><b>${lab}</b>${u.rinde?`<span class="chico">rinde base ${num2(u.rinde)} tn/ha</span>`:''}</td>
         <td class="n">${plata(p0)}/${un}<span class="chico">${fechaLinda(f0)}</span></td>
         <td class="n">${plata(A)}<span class="chico">IPC ×${ip.factor.toFixed(3)}${ip.parcial?' (hasta '+nombreMes(ip.hasta)+')':''}</span></td>
         <td class="n">${B!=null?plata(B):'—'}<span class="chico">${tc0&&tcF?`TC ${num2(tc0.venta)} → ${num2(tcF.venta)}`:'sin cotización'}</span></td>

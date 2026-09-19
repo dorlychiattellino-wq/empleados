@@ -489,7 +489,10 @@
           <button class="btn" onclick="abrirModalLote()">+ Cargar labor por lote</button>
           <button class="btn sec" onclick="abrirModalFac()">🧾 Facturar pendientes</button>
         </div>
-        <button class="btn peq linea" style="margin-top:8px" onclick="abrirModalTipos()">⚙️ Tipos de labor (agregar / editar / eliminar)</button>
+        <div class="fila2" style="margin-top:8px">
+          <button class="btn peq linea" onclick="abrirModalTipos()">⚙️ Tipos de labor</button>
+          <button class="btn peq linea" onclick="abrirModalCliente()">📄 Resumen para cliente (PDF)</button>
+        </div>
         <details class="filtros" style="margin-top:12px">
           <summary>🔍 Filtros</summary>
           <div class="fila2">
@@ -845,6 +848,40 @@
       </div>
     </div>
     <button class="btn-cancelar" onclick="cerrar('modal-tipos')">Cerrar</button>
+  </div>
+</div>
+
+<!-- ===== MODAL RESUMEN PARA CLIENTE ===== -->
+<div class="modal-bg" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-head"><h3>📄 Resumen para cliente</h3><button class="modal-cerrar" onclick="cerrar('modal-cliente')">×</button></div>
+    <p class="sub" style="margin-top:0">Detalle de labores y cuenta corriente con membrete de El Mestizo, para compartir o imprimir.</p>
+    <div class="fila2">
+      <div class="campo-form"><label>Planilla</label><select id="cl-planilla" onchange="llenarEstabsCliente();renderPreciosCliente()"><option>BERNARDO</option><option>GENERAL</option><option>PROPIO</option></select></div>
+      <div class="campo-form"><label>Establecimiento / cliente</label><select id="cl-estab" onchange="renderPreciosCliente()"></select></div>
+    </div>
+    <div class="fila2">
+      <div class="campo-form"><label>Desde (opcional)</label><input type="date" id="cl-desde" onchange="renderPreciosCliente()"></div>
+      <div class="campo-form"><label>Hasta (opcional)</label><input type="date" id="cl-hasta" onchange="renderPreciosCliente()"></div>
+    </div>
+    <div class="campo-form"><label>Labores a incluir</label>
+      <select id="cl-que" onchange="renderPreciosCliente()"><option value="sf">Solo sin facturar</option><option value="todas">Todas (facturadas y sin facturar)</option><option value="fact">Solo facturadas</option></select></div>
+    <div class="tarjeta" style="padding:10px 14px">
+      <label style="display:flex;gap:10px;align-items:center;font-size:14px;margin-bottom:8px"><input type="checkbox" id="cl-precios" class="fa-check" checked onchange="renderPreciosCliente()"> Incluir precio por labor e importes</label>
+      <div id="cl-precios-box" style="margin:4px 0 10px 28px">
+        <div class="sub" style="margin-bottom:6px">Verificá y ajustá el precio de cada labor (viene sugerido el último cargado):</div>
+        <div id="cl-precios-lista"></div>
+        <button class="btn peq linea" style="margin-top:6px" onclick="clPrecios={};renderPreciosCliente()">↺ Volver a los últimos precios cargados</button>
+      </div>
+      <label style="display:flex;gap:10px;align-items:center;font-size:14px;margin-bottom:8px"><input type="checkbox" id="cl-pagos" class="fa-check" checked> Incluir pagos recibidos y saldo a cobrar</label>
+      <label style="display:flex;gap:10px;align-items:center;font-size:14px"><input type="checkbox" id="cl-obs" class="fa-check" checked> Incluir observaciones de cada labor</label>
+    </div>
+    <div class="campo-form"><label>Nota al pie (opcional)</label><input id="cl-nota" placeholder="Ej: Precios sin IVA. Vencimiento 30 días."></div>
+    <div class="fila2">
+      <button class="btn" onclick="compartirCliente()">📤 Compartir PDF</button>
+      <button class="btn linea" onclick="imprimirCliente()">🖨️ Imprimir</button>
+    </div>
+    <button class="btn-cancelar" onclick="cerrar('modal-cliente')">Cerrar</button>
   </div>
 </div>
 
@@ -2142,6 +2179,158 @@ function calcularPrecios(){
     const b=document.createElement('a'); b.href='#'; b.textContent='Actualizar datos'; b.style.cssText='color:var(--campo);font-weight:700;margin-left:4px';
     b.onclick=e=>{e.preventDefault();ipcData=null;dolarData=null;calcularPrecios();}; est.appendChild(b);
   }).catch(()=>{est.textContent='No se pudieron consultar la inflación o el dólar. Revisá tu internet e intentá de nuevo.';out.innerHTML='';cmp.innerHTML='';});
+}
+
+
+/* =================== RESUMEN PARA CLIENTE (PDF) =================== */
+const EMPRESA={nombre:'El Mestizo',titular:'Osvaldo Gustavo Solsona',cuit:'20-22954901-5',iva:'Responsable Inscripto',tel:'+54 9 2655 64-6045',mail:'solsonagustavo@gmail.com',rubro:'Servicios agrícolas'};
+let clPrecios={};
+function abrirModalCliente(){
+  $('cl-planilla').value=ltPlanilla!=='__todas__'?ltPlanilla:'GENERAL';
+  llenarEstabsCliente();
+  const fe=$('lf-estab').value; if(fe)$('cl-estab').value=fe;
+  $('cl-desde').value=$('lf-desde').value||''; $('cl-hasta').value=$('lf-hasta').value||'';
+  clPrecios={}; renderPreciosCliente();
+  abrir('modal-cliente');
+}
+function renderPreciosCliente(){
+  const box=$('cl-precios-box'), lista=$('cl-precios-lista'); if(!box)return;
+  box.style.display=$('cl-precios').checked?'block':'none';
+  if(!$('cl-precios').checked)return;
+  const o=datosCliente();
+  const labs=[...new Set(o.regs.map(l=>l.labor))].sort();
+  if(!labs.length){lista.innerHTML='<div class="sub">No hay labores con esos filtros.</div>';return;}
+  lista.innerHTML=labs.map(lab=>{
+    if(clPrecios[lab]===undefined){const s=precioLaborAl(lab,o.h||null);clPrecios[lab]=s?s.importe:'';}
+    const s=precioLaborAl(lab,o.h||null);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <span style="flex:1 1 150px;font-size:13.5px"><b>${lab}</b><span class="chico" style="display:block;font-size:11px;color:var(--gris)">${s?'último cargado: '+plata(s.importe)+'/'+unidadLabor(lab)+' ('+fechaLinda(s.fecha)+')':'sin precio cargado'}</span></span>
+      <span style="font-size:12px;color:var(--gris)">$ por ${unidadLabor(lab)}</span>
+      <input type="number" step="0.01" class="fa-inp" style="width:130px" value="${clPrecios[lab]}" placeholder="0" oninput="clPrecios['${lab.replace(/'/g,"\\'")}']=this.value">
+    </div>`;}).join('');
+}
+function llenarEstabsCliente(){
+  const pl=$('cl-planilla').value;
+  const estabs=[...new Set(Object.values(lotes).filter(l=>l.planilla===pl).map(l=>l.estab).filter(Boolean))].sort();
+  $('cl-estab').innerHTML=`<option value="">Todos los de ${pl==='BERNARDO'?'Bernardo':pl.toLowerCase()}</option>`+estabs.map(e=>`<option>${e}</option>`).join('');
+}
+function precioLaborAl(labor,hasta){
+  const arr=Object.values(preciosLab).filter(p=>p.labor===labor).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(!arr.length)return null;
+  let r=null; for(const p of arr){if(!hasta||p.fecha<=hasta)r=p;}
+  return r||arr[arr.length-1];
+}
+function datosCliente(){
+  const pl=$('cl-planilla').value, es=$('cl-estab').value, d=$('cl-desde').value, h=$('cl-hasta').value, que=$('cl-que').value;
+  const conPrecios=$('cl-precios').checked, conPagos=$('cl-pagos').checked, conObs=$('cl-obs').checked, nota=$('cl-nota').value.trim();
+  const regs=Object.values(lotes).filter(l=>l.planilla===pl&&(!es||l.estab===es)&&entreFechas(l.fecha,d,h)&&(que==='todas'||(que==='sf'?(l.estado||'S/F')==='S/F':(l.estado||'S/F')==='FACT')))
+    .sort((a,b)=>(a.estab||'').localeCompare(b.estab||'')||(a.fecha||'').localeCompare(b.fecha||''));
+  const cob=Object.values(cobros).filter(c=>c.planilla===pl&&(!es||c.estab===es)&&entreFechas(c.fecha,d,h)).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  const cliente=es||(pl==='BERNARDO'?'BERNARDO':pl);
+  return {pl,es,d,h,que,conPrecios,conPagos,conObs,nota,regs,cob,cliente};
+}
+function armarHTMLCliente(){
+  const o=datosCliente();
+  if(!o.regs.length&&!o.cob.length){toast('No hay labores ni pagos para ese cliente con esos filtros');return null;}
+  if(o.conPrecios){
+    const faltan=[...new Set(o.regs.map(l=>l.labor))].filter(lab=>!(parseFloat(clPrecios[lab])>0));
+    if(faltan.length&&!confirm(`Estas labores no tienen precio cargado y saldrán sin importe:\n• ${faltan.join('\n• ')}\n\n¿Generar igual?`))return null;
+  }
+  const f=new Date();
+  const fechaImp=fechaLinda(hoy())+' '+('0'+f.getHours()).slice(-2)+':'+('0'+f.getMinutes()).slice(-2);
+  const periodo=(o.d||o.h)?`${o.d?fechaLinda(o.d):'inicio'} al ${o.h?fechaLinda(o.h):fechaLinda(hoy())}`:'todo el historial';
+  const queTxt={sf:'Labores pendientes de facturación',todas:'Detalle de labores',fact:'Labores facturadas'}[o.que];
+  const multiEstab=!o.es;
+  // ---- tabla labores ----
+  let total=0; const porLab={};
+  const filas=o.regs.map(l=>{
+    const u=unidadLabor(l.labor); const cant=l.fact!=null?l.fact:(l.cant||0);
+    const pv=o.conPrecios?parseFloat(clPrecios[l.labor]):NaN;
+    const pr=(o.conPrecios&&!isNaN(pv)&&pv>0)?{importe:pv}:null;
+    const imp=pr?cant*pr.importe:null; if(imp!=null)total+=imp;
+    porLab[l.labor]=porLab[l.labor]||{cant:0,imp:0,u}; porLab[l.labor].cant+=cant; porLab[l.labor].imp+=(imp||0);
+    const sf=(l.estado||'S/F')==='S/F';
+    return `<tr>
+      <td>${fechaLinda(l.fecha)}</td>
+      ${multiEstab?`<td>${l.estab||'—'}</td>`:''}
+      <td>${l.lote||'—'}</td>
+      <td>${l.labor}${o.conObs&&l.obs?`<br><span class="det">${l.obs}</span>`:''}</td>
+      <td class="der">${num2(cant)} ${u}</td>
+      ${o.conPrecios?`<td class="der">${pr?plata(pr.importe):'—'}</td><td class="der">${imp!=null?plata(imp):'—'}</td>`:''}
+      ${o.que!=='sf'?`<td>${sf?'<span class="rojo">Pendiente</span>':(l.nroFact&&l.nroFact!=='0'?'Fact. '+l.nroFact:'Facturado')}</td>`:''}
+    </tr>`;}).join('');
+  const cols=4+(multiEstab?1:0)+(o.conPrecios?2:0)+(o.que!=='sf'?1:0);
+  const extraEstado=o.que!=='sf'?'<td></td>':'';
+  const spanLab=cols-1-(o.conPrecios?2:0)-(o.que!=='sf'?1:0); // fecha(+estab)+lote+labor
+  const resumenLab=Object.entries(porLab).map(([lab,t])=>`<tr><td colspan="${spanLab}">${lab}</td><td class="der">${num2(t.cant)} ${t.u}</td>${o.conPrecios?`<td></td><td class="der">${plata(t.imp)}</td>`:''}${extraEstado}</tr>`).join('');
+  // ---- pagos ----
+  let totCob=0; const filasCob=o.cob.map(c=>{totCob+=(c.importe||0);return `<tr><td>${fechaLinda(c.fecha)}</td><td>${c.estab||'—'}</td><td>${c.concepto||''}</td><td>${c.medio||''}${c.obs?`<br><span class="det">${c.obs}</span>`:''}</td><td class="der">${plata(c.importe)}</td></tr>`;}).join('');
+  const saldo=total-totCob;
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Resumen de cuenta — ${o.cliente}</title>
+  <style>
+    *{box-sizing:border-box;font-family:Georgia,'Times New Roman',serif}
+    body{margin:0;padding:30px;color:#1f261c}
+    .cab{display:flex;align-items:center;gap:16px;border-bottom:3px solid #2f5d34;padding-bottom:12px;margin-bottom:10px}
+    .cab img{height:66px}
+    .cab h1{margin:0;font-size:28px;color:#1a2e1a;letter-spacing:.5px}
+    .cab .sub{margin:2px 0 0;font-size:13px;color:#2f5d34;font-family:Arial,sans-serif;font-weight:bold;text-transform:uppercase;letter-spacing:.6px}
+    .emp{font-family:Arial,sans-serif;font-size:11px;color:#4a4f46;line-height:1.5;margin-left:auto;text-align:right}
+    .emp b{color:#1f261c}
+    .cli{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f3f5ee;border-radius:10px;padding:10px 14px;margin:14px 0;font-family:Arial,sans-serif;font-size:12.5px}
+    .cli b{color:#1a2e1a}
+    h2{font-size:15px;margin:20px 0 8px;color:#1a2e1a;border-left:4px solid #d9b44a;padding-left:8px}
+    table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12.5px}
+    th{background:#2f5d34;color:#fff;text-align:left;padding:7px 8px;font-weight:bold;font-size:11.5px}
+    th.der,td.der{text-align:right;white-space:nowrap}
+    td{padding:6px 8px;border-bottom:1px solid #e4e2d6;vertical-align:top}
+    .det{color:#6b7268;font-size:11px}
+    tr:nth-child(even) td{background:#faf9f4}
+    tfoot td{font-weight:bold;background:#f0f6ee!important}
+    .tot{display:flex;gap:12px;margin:14px 0 4px}
+    .tot div{flex:1;border:1px solid #e4e2d6;border-radius:10px;padding:10px;text-align:center}
+    .tot .et{font-family:Arial,sans-serif;font-size:10.5px;text-transform:uppercase;color:#6b7268;letter-spacing:.5px}
+    .tot .num{font-size:18px;font-weight:bold;margin-top:3px}
+    .verde{color:#3a8a4a}.rojo{color:#b23a3a}
+    .nota{font-family:Arial,sans-serif;font-size:11.5px;color:#4a4f46;background:#fff7e0;border-left:3px solid #d9b44a;padding:8px 12px;margin-top:14px}
+    .pie{margin-top:22px;font-family:Arial,sans-serif;font-size:10.5px;color:#9a9a8e;text-align:center;border-top:1px solid #e4e2d6;padding-top:8px}
+    @media print{body{padding:16px}}
+  </style></head><body>
+    <div class="cab">
+      <img src="${LOGO_PDF}">
+      <div><h1>${EMPRESA.nombre}</h1><p class="sub">${EMPRESA.rubro} · Resumen de labores y cuenta corriente</p></div>
+      <div class="emp"><b>${EMPRESA.nombre} de ${EMPRESA.titular}</b><br>CUIT ${EMPRESA.cuit} · ${EMPRESA.iva}<br>Tel. ${EMPRESA.tel}<br>${EMPRESA.mail}</div>
+    </div>
+    <div class="cli">
+      <span>Cliente: <b>${o.cliente}</b>${multiEstab&&o.pl==='BERNARDO'?' (todos los establecimientos)':''}</span>
+      <span>Período: <b>${periodo}</b></span>
+      <span>Emitido: <b>${fechaImp}</b></span>
+    </div>
+    ${o.regs.length?`<h2>${queTxt}</h2>
+    <table>
+      <thead><tr><th>Fecha</th>${multiEstab?'<th>Establecimiento</th>':''}<th>Lote</th><th>Labor</th><th class="der">Cantidad</th>${o.conPrecios?'<th class="der">Precio unit.</th><th class="der">Importe</th>':''}${o.que!=='sf'?'<th>Estado</th>':''}</tr></thead>
+      <tbody>${filas}</tbody>
+      <tfoot>${resumenLab}${o.conPrecios?`<tr><td colspan="${cols-1-(o.que!=='sf'?1:0)}">TOTAL LABORES</td><td class="der">${plata(total)}</td>${extraEstado}</tr>`:''}</tfoot>
+    </table>`:''}
+    ${o.conPagos?`<h2>Pagos recibidos</h2>
+    ${o.cob.length?`<table><thead><tr><th>Fecha</th><th>Establecimiento</th><th>Concepto</th><th>Medio</th><th class="der">Importe</th></tr></thead>
+      <tbody>${filasCob}</tbody><tfoot><tr><td colspan="4">TOTAL PAGOS RECIBIDOS</td><td class="der">${plata(totCob)}</td></tr></tfoot></table>`:
+      `<p style="font-family:Arial,sans-serif;font-size:12px;color:#6b7268;margin:4px 0">Sin pagos registrados en el período.</p>`}
+    ${o.conPrecios?`<div class="tot">
+      <div><div class="et">Total labores</div><div class="num">${plata(total)}</div></div>
+      <div><div class="et">Pagos recibidos</div><div class="num verde">${plata(totCob)}</div></div>
+      <div><div class="et">Saldo a cobrar</div><div class="num ${saldo>0?'rojo':'verde'}">${plata(saldo)}</div></div>
+    </div>`:''}`:''}
+    ${o.conPrecios?`<div class="nota">Importes calculados con los precios unitarios indicados, sobre las cantidades ${o.que==='sf'?'a facturar':'facturadas / a facturar'}.${o.nota?' '+o.nota:''}</div>`:(o.nota?`<div class="nota">${o.nota}</div>`:'')}
+    <div class="pie">${EMPRESA.nombre} · ${EMPRESA.rubro} · Tel. ${EMPRESA.tel} · ${EMPRESA.mail} · Emitido el ${fechaImp}</div>
+    <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
+  </body></html>`;
+  return html;
+}
+function imprimirCliente(){const html=armarHTMLCliente(); if(html)abrirImpresion(html);}
+function compartirCliente(){
+  const html=armarHTMLCliente(); if(!html)return;
+  const o=datosCliente();
+  compartirComoPDF(html,'Resumen_'+archivoSeguro(o.cliente)+'_'+hoy()+'.pdf','Resumen de cuenta — '+o.cliente);
 }
 
 /* =================== IMPRIMIR / PDF =================== */

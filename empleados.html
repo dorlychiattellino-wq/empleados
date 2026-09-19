@@ -540,6 +540,20 @@
           <p class="sub" id="calc-estado" style="margin:0">Usa inflación INDEC, dólar oficial BNA (venta) y tu historial de gasoil.</p>
         </div>
         <div id="calc-resultado"></div>
+
+        <div class="tarjeta" style="margin-top:16px">
+          <h3 style="margin:0 0 4px;font-size:16px">🔎 Comparar con un precio del historial</h3>
+          <p class="sub" style="margin:0 0 10px">Elegí un precio puntual (por ejemplo, la siembra de soja del año pasado) y te calcula cuánto valdría a la fecha elegida.</p>
+          <div class="fila2">
+            <div class="campo-form"><label>Labor</label><select id="cmp-labor" onchange="llenarCmpPrecios()"><option value="">Todas</option></select></div>
+            <div class="campo-form"><label>Precio del historial</label><select id="cmp-precio"></select></div>
+          </div>
+          <div class="fila2">
+            <button class="btn peq" onclick="agregarCmp()">+ Agregar a la comparación</button>
+            <button class="btn peq gris" onclick="calcSel=[];calcularPrecios()">Limpiar comparación</button>
+          </div>
+        </div>
+        <div id="calc-comparativo"></div>
       </div>
 
       <!-- COBROS -->
@@ -1585,7 +1599,7 @@ function irSub(s,btn){
   ['registros','precios','gasoil','calc','cobros'].forEach(x=>{$('lt-'+x).style.display=(x===s?'block':'none');});
   document.querySelectorAll('.subpills button').forEach(b=>b.classList.remove('activa'));
   if(btn)btn.classList.add('activa');
-  if(s==='calc'&&!$('calc-fecha').value)$('calc-fecha').value=hoy();
+  if(s==='calc'){if(!$('calc-fecha').value)$('calc-fecha').value=hoy();llenarCmpLabores();}
 }
 function llenarSelectLabores(sel,incluirVacio){
   const base=listaLabores();
@@ -2017,44 +2031,77 @@ function gasoilHasta(f){ // último con fecha <= f, si no hay el más antiguo
   let r=null; for(const g of arr){if(g.fecha<=f)r=g;else break;}
   return r||arr[0];
 }
+let calcSel=[];
+function llenarCmpLabores(){
+  const s=$('cmp-labor'); if(!s)return;
+  const v=s.value;
+  const labs=[...new Set(Object.values(preciosLab).map(p=>p.labor))].sort();
+  s.innerHTML='<option value="">Todas</option>'+labs.map(l=>`<option>${l}</option>`).join('');
+  s.value=v; llenarCmpPrecios();
+}
+function llenarCmpPrecios(){
+  const s=$('cmp-precio'); if(!s)return;
+  const fl=$('cmp-labor').value;
+  const arr=Object.entries(preciosLab).filter(([id,p])=>!fl||p.labor===fl).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+  s.innerHTML=arr.length?arr.map(([id,p])=>`<option value="${id}">${fechaLinda(p.fecha)} · ${p.labor} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.obs?' · '+p.obs:''}</option>`).join(''):'<option value="">No hay precios cargados</option>';
+}
+function agregarCmp(){
+  const id=$('cmp-precio').value; if(!id){toast('Elegí un precio del historial');return;}
+  if(!calcSel.includes(id))calcSel.push(id);
+  calcularPrecios();
+}
+function quitarCmp(id){calcSel=calcSel.filter(x=>x!==id);calcularPrecios();}
+function filaCalc(u,F,tcF,titulo,extraAcc){
+  const lab=u.labor, p0=u.importe, f0=u.fecha;
+  const ip=factorIPC(f0,F); const A=p0*ip.factor;
+  const tc0=tcVenta(f0); const B=(tc0&&tcF)?p0/tc0.venta*tcF.venta:null;
+  const g0=gasoilCercano(f0), gF=gasoilHasta(F);
+  const C=(g0&&gF&&g0!==gF)?p0*gF.precio/g0.precio:null;
+  const vals=[A,B,C].filter(x=>x!=null&&isFinite(x));
+  const prom=vals.length?vals.reduce((s,x)=>s+x,0)/vals.length:null;
+  const un=unidadLabor(lab);
+  return `<tr>
+    <td>${titulo}${u.rinde?`<span class="chico">rinde base ${num2(u.rinde)} tn/ha</span>`:''}${extraAcc||''}</td>
+    <td class="n">${plata(p0)}/${un}<span class="chico">${fechaLinda(f0)}</span></td>
+    <td class="n">${plata(A)}<span class="chico">IPC ×${ip.factor.toFixed(3)}${ip.parcial?' (hasta '+nombreMes(ip.hasta)+')':''}</span></td>
+    <td class="n">${B!=null?plata(B):'—'}<span class="chico">${tc0&&tcF?`TC ${num2(tc0.venta)} → ${num2(tcF.venta)}`:'sin cotización'}</span></td>
+    <td class="n">${C!=null?plata(C):'—'}<span class="chico">${g0&&gF&&g0!==gF?`gasoil ${plata(g0.precio)} (${fechaLinda(g0.fecha)}) → ${plata(gF.precio)} (${fechaLinda(gF.fecha)})`:'faltan compras de gasoil'}</span></td>
+    <td class="n prom">${prom!=null?plata(prom):'—'}<span class="chico">${vals.length} de 3 métodos</span></td>
+  </tr>`;
+}
+const CABECERA_CALC=(c1)=>`<thead><tr><th>${c1}</th><th>Precio base</th><th>A) Inflación $</th><th>B) Dólar BNA</th><th>C) Gasoil</th><th>Promedio</th></tr></thead>`;
 function calcularPrecios(){
   const F=$('calc-fecha').value||hoy();
-  const est=$('calc-estado'), out=$('calc-resultado');
+  const est=$('calc-estado'), out=$('calc-resultado'), cmp=$('calc-comparativo');
+  llenarCmpLabores();
   const labs=[...new Set(Object.values(preciosLab).map(p=>p.labor))];
-  if(!labs.length){out.innerHTML=vacio('💲','Primero cargá precios de labores en la pestaña "Precios de labores"');return;}
+  if(!labs.length){out.innerHTML=vacio('💲','Primero cargá precios de labores en la pestaña "Precios de labores"');cmp.innerHTML='';return;}
   est.textContent='Consultando inflación y dólar…';
   cargarIndices().then(()=>{
     const ipc=ipcData.length?ipcData[ipcData.length-1]:null;
     const tcF=tcVenta(F);
+    // --- tabla automática: último precio de cada labor ---
     const filas=labs.sort().map(lab=>{
       const hist=Object.values(preciosLab).filter(p=>p.labor===lab).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-      const u=hist[hist.length-1]; const p0=u.importe, f0=u.fecha;
-      const ip=factorIPC(f0,F); const A=p0*ip.factor;
-      const tc0=tcVenta(f0); const B=(tc0&&tcF)?p0/tc0.venta*tcF.venta:null;
-      const g0=gasoilCercano(f0), gF=gasoilHasta(F);
-      const C=(g0&&gF&&g0!==gF)?p0*gF.precio/g0.precio:null;
-      const vals=[A,B,C].filter(x=>x!=null&&isFinite(x));
-      const prom=vals.length?vals.reduce((s,x)=>s+x,0)/vals.length:null;
-      const un=unidadLabor(lab);
-      return `<tr>
-        <td><b>${lab}</b>${u.rinde?`<span class="chico">rinde base ${num2(u.rinde)} tn/ha</span>`:''}</td>
-        <td class="n">${plata(p0)}/${un}<span class="chico">${fechaLinda(f0)}</span></td>
-        <td class="n">${plata(A)}<span class="chico">IPC ×${ip.factor.toFixed(3)}${ip.parcial?' (hasta '+nombreMes(ip.hasta)+')':''}</span></td>
-        <td class="n">${B!=null?plata(B):'—'}<span class="chico">${tc0&&tcF?`TC ${num2(tc0.venta)} → ${num2(tcF.venta)}`:'sin cotización'}</span></td>
-        <td class="n">${C!=null?plata(C):'—'}<span class="chico">${g0&&gF&&g0!==gF?`gasoil ${plata(g0.precio)} (${fechaLinda(g0.fecha)}) → ${plata(gF.precio)} (${fechaLinda(gF.fecha)})`:'faltan compras de gasoil'}</span></td>
-        <td class="n prom">${prom!=null?plata(prom):'—'}<span class="chico">${vals.length} de 3 métodos</span></td>
-      </tr>`;
+      return filaCalc(hist[hist.length-1],F,tcF,`<b>${lab}</b>`);
     }).join('');
-    out.innerHTML=`<div class="tabla-wrap"><table class="tabla-calc">
-      <thead><tr><th>Labor</th><th>Último precio</th><th>A) Inflación $</th><th>B) Dólar BNA</th><th>C) Gasoil</th><th>Promedio</th></tr></thead>
-      <tbody>${filas}</tbody></table></div>
+    out.innerHTML=`<div class="tabla-wrap"><table class="tabla-calc">${CABECERA_CALC('Labor (último precio)')}<tbody>${filas}</tbody></table></div>
       <div class="nota-calc">📌 <b>Al ${fechaLinda(F)}.</b> A) actualiza por inflación mensual INDEC${ipc?` (último dato: ${nombreMes(ipc.fecha.slice(0,7))}, ${ipc.valor}%)`:''}.
       B) dolariza el precio viejo al BNA venta de esa fecha y lo pesifica al BNA venta ${tcF&&tcF.hoy?'de hoy':'de la fecha elegida'}${tcF?` ($${num2(tcF.venta)})`:''}.
-      C) aplica la suba del gasoil entre la compra más cercana al último precio y la última compra hasta la fecha. El promedio es de los métodos disponibles.</div>`;
+      C) aplica la suba del gasoil entre la compra más cercana al precio base y la última compra hasta la fecha. El promedio es de los métodos disponibles.</div>`;
+    // --- tabla comparativa: precios elegidos del historial ---
+    calcSel=calcSel.filter(id=>preciosLab[id]);
+    if(calcSel.length){
+      const fc=calcSel.map(id=>{const u=preciosLab[id];
+        return filaCalc(u,F,tcF,`<b>${u.labor}</b>${u.obs?`<span class="chico" style="color:var(--campo);font-weight:700">${u.obs}</span>`:''}`,
+          `<span class="chico"><a href="#" onclick="quitarCmp('${id}');return false;" style="color:var(--rojo)">✕ quitar</a></span>`);}).join('');
+      cmp.innerHTML=`<h3 style="margin:16px 0 8px;font-size:16px">🔎 Comparativo · precios elegidos del historial</h3>
+        <div class="tabla-wrap"><table class="tabla-calc">${CABECERA_CALC('Labor · cultivo / detalle')}<tbody>${fc}</tbody></table></div>`;
+    }else cmp.innerHTML='';
     est.textContent=`Datos consultados ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}. `;
     const b=document.createElement('a'); b.href='#'; b.textContent='Actualizar datos'; b.style.cssText='color:var(--campo);font-weight:700;margin-left:4px';
     b.onclick=e=>{e.preventDefault();ipcData=null;dolarData=null;calcularPrecios();}; est.appendChild(b);
-  }).catch(()=>{est.textContent='No se pudieron consultar la inflación o el dólar. Revisá tu internet e intentá de nuevo.';out.innerHTML='';});
+  }).catch(()=>{est.textContent='No se pudieron consultar la inflación o el dólar. Revisá tu internet e intentá de nuevo.';out.innerHTML='';cmp.innerHTML='';});
 }
 
 /* =================== IMPRIMIR / PDF =================== */

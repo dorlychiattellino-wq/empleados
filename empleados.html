@@ -1719,20 +1719,21 @@ function renderLotes(){
 
   // totales por labor
   const porLab={}; let sf=0, sfCant=0, difAcum=0;
+  let hayBern=false;
   arr.forEach(([id,l])=>{
-    const u=unidadLabor(l.labor);
-    porLab[l.labor]=porLab[l.labor]||{cant:0,fact:0,u};
+    const u=unidadLabor(l.labor); const esB=l.planilla==='BERNARDO';
+    porLab[l.labor]=porLab[l.labor]||{cant:0,fact:0,u,bern:false};
     porLab[l.labor].cant+=(l.cant||0);
-    porLab[l.labor].fact+=(l.fact!=null?l.fact:(l.cant||0));
+    if(esB){porLab[l.labor].bern=true;hayBern=true;porLab[l.labor].fact+=(l.fact!=null?l.fact:(l.cant||0));}
     if((l.estado||'S/F')==='S/F'){sf++;sfCant+=(l.cant||0);}
-    if(l.fact!=null)difAcum+=(l.cant||0)-(l.fact||0);
+    if(esB&&l.fact!=null)difAcum+=(l.cant||0)-(l.fact||0);
   });
   $('lt-totales').innerHTML=arr.length?`
     <div class="tarjeta" style="padding:12px 14px;margin-top:12px">
       <div style="font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;margin-bottom:6px">Totales de lo filtrado · ${arr.length} registros</div>
-      ${Object.entries(porLab).map(([lab,t])=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>${lab}</span><b>${num2(t.cant)} ${t.u}${Math.abs(t.cant-t.fact)>0.01?` <span class="sub" style="font-size:12px">(fact. ${num2(t.fact)})</span>`:''}</b></div>`).join('')}
+      ${Object.entries(porLab).map(([lab,t])=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>${lab}</span><b>${num2(t.cant)} ${t.u}${t.bern&&ltPlanilla==='BERNARDO'&&Math.abs(t.cant-t.fact)>0.01?` <span class="sub" style="font-size:12px">(a fact. ${num2(t.fact)})</span>`:''}</b></div>`).join('')}
       <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:6px;border-top:1px solid var(--gris-cl);font-size:13.5px"><span>Sin facturar</span><b style="color:var(--rojo)">${sf} reg. · ${num2(sfCant)}</b></div>
-      ${Math.abs(difAcum)>0.01?`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>Diferencia monitor − facturado</span><b class="${difAcum>0?'dif-mal':'dif-ok'}">${num2(difAcum)}</b></div>`:''}
+      ${hayBern&&Math.abs(difAcum)>0.01?`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>Diferencia monitor − a facturar (Bernardo)</span><b class="${difAcum>0?'dif-mal':'dif-ok'}">${num2(difAcum)}</b></div>`:''}
     </div>`:'';
 
   const cont=$('lista-lotes');
@@ -1751,7 +1752,7 @@ function renderLotes(){
           <span class="reg-titulo">${l.estab||'—'}${l.lote?' · Lote '+l.lote:''}</span>
         </div>
         <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🚜 ${l.labor}${l.maq?' · 👤 '+l.maq:''}</div>
-        <div class="reg-meta">${fact!=null&&Math.abs(dif)>0.005?`Monitor <b>${num2(l.cant)}</b> · A facturar <b>${num2(fact)}</b> · Dif. <span class="${dif>0?'dif-mal':'dif-ok'}">${num2(dif)}</span>`:''}${l.dif?` · Ajuste ${num2(l.dif)}`:''}${l.nroFact&&l.nroFact!=='0'?` · 🧾 ${l.nroFact}${l.fechaFact?' ('+fechaLinda(l.fechaFact)+')':''}`:''}</div>
+        <div class="reg-meta">${l.planilla==='BERNARDO'&&fact!=null&&Math.abs(dif)>0.005?`Monitor <b>${num2(l.cant)}</b> · A facturar <b>${num2(fact)}</b> · Dif. <span class="${dif>0?'dif-mal':'dif-ok'}">${num2(dif)}</span>`:''}${l.planilla==='BERNARDO'&&l.dif?` · Ajuste ${num2(l.dif)}`:''}${l.nroFact&&l.nroFact!=='0'?` · 🧾 ${l.nroFact}${l.fechaFact?' ('+fechaLinda(l.fechaFact)+')':''}`:''}</div>
         ${l.obs?`<div class="reg-obs">${l.obs}</div>`:''}
         <div class="reg-acc">
           <button class="icono-btn" onclick="abrirModalLote('${id}')">✏️</button>

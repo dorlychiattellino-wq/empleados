@@ -681,10 +681,13 @@
       <div class="sub" style="margin-bottom:5px;font-size:12px" id="labor-lotes-sug-t"></div>
       <div id="labor-lotes-sug-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
-    <div class="campo-form autobox">
-      <label>Cultivo (opcional)</label>
-      <input id="labor-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío…" oninput="autocompletar(this,'cultivos');sugerirPreciosLabor()" onfocus="autocompletar(this,'cultivos')">
-      <div class="sugerencias"></div>
+    <div class="fila2">
+      <div class="campo-form autobox">
+        <label>Cultivo (opcional)</label>
+        <input id="labor-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío…" oninput="autocompletar(this,'cultivos');sugerirPreciosLabor()" onfocus="autocompletar(this,'cultivos')">
+        <div class="sugerencias"></div>
+      </div>
+      <div class="campo-form"><label>Rinde (tn/ha, opcional)</label><input type="number" id="labor-rinde" step="0.01" placeholder="Ej: 10,5" oninput="sugerirPreciosLabor()"></div>
     </div>
     <div class="fila2">
       <div class="campo-form"><label>Precio por ha ($)</label><input type="number" id="labor-precio" step="0.01" placeholder="0" oninput="previewLabor()"></div>
@@ -1143,11 +1146,11 @@ function abrirModalLabor(id){
   $('labor-id').value=id||'';
   const l=id?labores[id]:null;
   if(l){$('modal-labor-titulo').textContent='Editar labor';
-    $('labor-fecha').value=l.fecha;$('labor-campo').value=l.campo;$('labor-act').value=l.act;$('labor-cultivo').value=l.cultivo||'';
+    $('labor-fecha').value=l.fecha;$('labor-campo').value=l.campo;$('labor-act').value=l.act;$('labor-cultivo').value=l.cultivo||'';$('labor-rinde').value=l.rinde||'';
     $('labor-precio').value=l.precio;$('labor-has').value=l.has;
     (l.participantes||[]).forEach(p=>editLaborChips[p.emp]=p.pct);
   }else{$('modal-labor-titulo').textContent='Nueva labor';$('labor-fecha').value=fechaSesion.labor||hoy();
-    $('labor-campo').value='';$('labor-act').value='';$('labor-cultivo').value='';$('labor-precio').value='';$('labor-has').value='';}
+    $('labor-campo').value='';$('labor-act').value='';$('labor-cultivo').value='';$('labor-rinde').value='';$('labor-precio').value='';$('labor-has').value='';}
   renderChipsLabor();
   sugerirPreciosLabor();
   sugerirDesdeLotes();
@@ -1207,7 +1210,9 @@ function guardarLabor(){
   });
   const id=$('labor-id').value||uid();
   fechaSesion.labor=$('labor-fecha').value;
-  guardar('labores/'+id,{fecha:$('labor-fecha').value,campo,act,cultivo:normalizarCultivo($('labor-cultivo').value),precio,has,participantes},'Labor guardada y repartida');
+  const objL={fecha:$('labor-fecha').value,campo,act,cultivo:normalizarCultivo($('labor-cultivo').value),precio,has,participantes};
+  if($('labor-rinde').value)objL.rinde=parseFloat($('labor-rinde').value)||0;
+  guardar('labores/'+id,objL,'Labor guardada y repartida');
   cerrar('modal-labor');
 }
 /* precios del historial que se parecen a la actividad, ordenados por cercanía a la fecha */
@@ -1220,13 +1225,22 @@ function sugerirPreciosLabor(){
   const palabras=s=>norm(s).split(/\s+/).filter(w=>w.length>=3&&!STOP.has(w));
   const pa=palabras(act);
   let arr=Object.values(preciosLab).filter(p=>{const pb=palabras(p.labor);return pa.some(w=>pb.includes(w));});
-  if(cult){const c=arr.filter(p=>(p.cultivo||'')===cult);if(c.length)arr=c;}
-  const t=new Date(f).getTime(), est=titulo($('labor-campo').value);
-  arr.sort((a,b)=>{const ea=(est&&a.estab===est)?0:1, eb=(est&&b.estab===est)?0:1; if(ea!==eb)return ea-eb;
-    return Math.abs(new Date(a.fecha).getTime()-t)-Math.abs(new Date(b.fecha).getTime()-t);});
+  const t=new Date(f).getTime(), est=titulo($('labor-campo').value), rinde=parseFloat($('labor-rinde').value)||0;
+  // puntaje: mismo establecimiento > mismo cultivo > cercanía combinada de fecha (90 días = 1) y rinde (2 tn/ha = 1)
+  const score=p=>{
+    const dias=Math.abs(new Date(p.fecha).getTime()-t)/86400000;
+    let s=dias/90;
+    if(rinde&&p.rinde)s+=Math.abs(p.rinde-rinde)/2;
+    return s;
+  };
+  arr.sort((a,b)=>{
+    const ea=(est&&a.estab===est)?0:1, eb=(est&&b.estab===est)?0:1; if(ea!==eb)return ea-eb;
+    const ca=(cult&&(a.cultivo||'')===cult)?0:1, cb=(cult&&(b.cultivo||'')===cult)?0:1; if(ca!==cb)return ca-cb;
+    return score(a)-score(b);
+  });
   if(!arr.length){box.style.display='none';return;}
   sel.innerHTML='<option value="">— elegir un precio cargado —</option>'+arr.slice(0,12).map(p=>
-    `<option value="${p.importe}">${(est&&p.estab===est)?'★ ':''}${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''}${p.estab?' · '+p.estab:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.rinde?' · rinde '+num2(p.rinde):''}</option>`).join('');
+    `<option value="${p.importe}">${(est&&p.estab===est)?'★ ':''}${(cult&&(p.cultivo||'')===cult)?'🌱 ':''}${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''}${p.estab?' · '+p.estab:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.rinde?' · rinde '+num2(p.rinde):''}</option>`).join('');
   box.style.display='block';
 }
 /* registros de Lotes y labores del mismo establecimiento, cercanos a la fecha */

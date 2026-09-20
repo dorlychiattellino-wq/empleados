@@ -2314,7 +2314,7 @@ function armarHTMLCliente(){
     .cab img{height:66px}
     .cab h1{margin:0;font-size:28px;color:#1a2e1a;letter-spacing:.5px}
     .cab .sub{margin:2px 0 0;font-size:13px;color:#2f5d34;font-family:Arial,sans-serif;font-weight:bold;text-transform:uppercase;letter-spacing:.6px}
-    .emp{font-family:Arial,sans-serif;font-size:11px;color:#4a4f46;line-height:1.5;margin-left:auto;text-align:right}
+    .emp{font-family:Arial,sans-serif;font-size:11px;color:#4a4f46;line-height:1.5;margin-left:auto;text-align:right;white-space:nowrap;flex:0 0 auto}
     .emp b{color:#1f261c}
     .cli{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f3f5ee;border-radius:10px;padding:10px 14px;margin:14px 0;font-family:Arial,sans-serif;font-size:12.5px}
     .cli b{color:#1a2e1a}
@@ -2338,7 +2338,7 @@ function armarHTMLCliente(){
     <div class="cab">
       <img src="${LOGO_PDF}">
       <div><h1>${EMPRESA.nombre}</h1><p class="sub">${EMPRESA.rubro} · Resumen de labores y cuenta corriente</p></div>
-      <div class="emp"><b>${EMPRESA.nombre} de ${EMPRESA.titular}</b><br>CUIT ${EMPRESA.cuit} · ${EMPRESA.iva}<br>Tel. ${EMPRESA.tel}<br>${EMPRESA.mail}</div>
+      <div class="emp"><b>${EMPRESA.titular}</b><br>CUIT ${EMPRESA.cuit}<br>${EMPRESA.iva}<br>Tel. ${EMPRESA.tel}<br>${EMPRESA.mail}</div>
     </div>
     <div class="cli">
       <span>Cliente: <b>${o.cliente}</b>${multiEstab&&o.pl==='BERNARDO'?' (todos los establecimientos)':''}</span>

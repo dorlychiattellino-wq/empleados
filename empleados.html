@@ -659,17 +659,26 @@
     </div>
     <input type="hidden" id="labor-id">
     <div class="fila2">
-      <div class="campo-form"><label>Fecha</label><input type="date" id="labor-fecha"></div>
+      <div class="campo-form"><label>Fecha</label><input type="date" id="labor-fecha" onchange="sugerirPreciosLabor()"></div>
       <div class="campo-form"><label>Nombre del campo</label><input id="labor-campo" placeholder="Ej: La Esperanza"></div>
     </div>
     <div class="campo-form autobox">
       <label>Actividad</label>
-      <input id="labor-act" autocomplete="off" placeholder="Ej: siembra con s/f" oninput="autocompletar(this,'actividades')" onfocus="autocompletar(this,'actividades')">
+      <input id="labor-act" autocomplete="off" placeholder="Ej: siembra con s/f" oninput="autocompletar(this,'actividades');sugerirPreciosLabor()" onfocus="autocompletar(this,'actividades')" onblur="setTimeout(sugerirPreciosLabor,250)">
       <div class="sugerencias" id="sug-labor-act"></div>
+    </div>
+    <div class="campo-form autobox">
+      <label>Cultivo (opcional)</label>
+      <input id="labor-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío…" oninput="autocompletar(this,'cultivos');sugerirPreciosLabor()" onfocus="autocompletar(this,'cultivos')">
+      <div class="sugerencias"></div>
     </div>
     <div class="fila2">
       <div class="campo-form"><label>Precio por ha ($)</label><input type="number" id="labor-precio" step="0.01" placeholder="0" oninput="previewLabor()"></div>
       <div class="campo-form"><label>Cantidad de has</label><input type="number" id="labor-has" step="0.01" placeholder="0" oninput="previewLabor()"></div>
+    </div>
+    <div class="campo-form" id="labor-sug-box" style="display:none">
+      <label>Precios cargados (orientativo, más cercano a la fecha primero)</label>
+      <select id="labor-sug" onchange="usarPrecioSug()"></select>
     </div>
     <div class="campo-form">
       <label>Trabajadores que realizaron la labor</label>
@@ -899,6 +908,7 @@ let lotes={}, preciosLab={}, gasoil={}, cobros={}, tiposLabor={};
 let cargadoLt={lotes:false,precios:false,tipos:false}, migracionLtHecha=false;
 let ltPlanilla='__todas__', ltSub='registros', ltMostrar=120;
 let empSeleccionado='__todos__';
+let fechaSesion={};  // última fecha usada por tipo de carga (solo mientras la app está abierta)
 let editLaborChips={};
 let editItems=[];
 
@@ -969,7 +979,8 @@ function escucharDatos(){
   db.ref('ganaderos').on('value',s=>{ganaderos=s.val()||{};render();mostrar();});
   db.ref('lotes').on('value',s=>{lotes=s.val()||{};cargadoLt.lotes=true;render();chequearMigracionLt();});
   db.ref('preciosLab').on('value',s=>{preciosLab=s.val()||{};cargadoLt.precios=true;render();chequearMigracionLt();});
-  db.ref('tiposLabor').on('value',s=>{tiposLabor=s.val()||{};cargadoLt.tipos=true;render();chequearMigracionLt();});
+  db.ref('tiposLabor').on('value',s=>{tiposLabor=s.val()||{};cargadoLt.tipos=true;render();chequearMigracionLt();chequearRestauracion();});
+  setTimeout(terminarRestauracion,6000); // por si alguna colección tarda
   db.ref('gasoil').on('value',s=>{gasoil=s.val()||{};render();});
   db.ref('cobros').on('value',s=>{cobros=s.val()||{};render();});
   setTimeout(mostrar,4000);
@@ -987,6 +998,7 @@ function borrarRegistro(ruta,msg){
 
 /* =================== NAVEGACIÓN =================== */
 function irVista(v,btn){
+  setTimeout(guardarFiltros,0);
   document.querySelectorAll('.vista').forEach(e=>e.classList.remove('activa'));
   $('v-'+v).classList.add('activa');
   document.querySelectorAll('nav.principal button').forEach(b=>b.classList.remove('activo'));
@@ -1037,7 +1049,7 @@ function abrirModalPago(id){
   if(id){const p=pagos[id];$('modal-pago-titulo').textContent='Editar pago';
     $('pago-fecha').value=p.fecha;$('pago-emp').value=p.emp;$('pago-cat').value=p.cat;
     $('pago-monto').value=p.monto;$('pago-obs').value=p.obs||'';}
-  else{$('modal-pago-titulo').textContent='Nuevo pago';$('pago-fecha').value=hoy();
+  else{$('modal-pago-titulo').textContent='Nuevo pago';$('pago-fecha').value=fechaSesion.pago||hoy();
     $('pago-cat').value='';$('pago-monto').value='';$('pago-obs').value='';}
   abrir('modal-pago');
 }
@@ -1048,6 +1060,7 @@ function guardarPago(){
   if(!cat){toast('Poné una categoría/descripción');return;}
   if(!monto){toast('Poné un importe');return;}
   const id=$('pago-id').value||uid();
+  fechaSesion.pago=$('pago-fecha').value;
   guardar('pagos/'+id,{fecha:$('pago-fecha').value,emp,cat,monto,obs:$('pago-obs').value.trim()},'Pago guardado');
   cerrar('modal-pago');
 }
@@ -1059,12 +1072,13 @@ function abrirModalLabor(id){
   $('labor-id').value=id||'';
   const l=id?labores[id]:null;
   if(l){$('modal-labor-titulo').textContent='Editar labor';
-    $('labor-fecha').value=l.fecha;$('labor-campo').value=l.campo;$('labor-act').value=l.act;
+    $('labor-fecha').value=l.fecha;$('labor-campo').value=l.campo;$('labor-act').value=l.act;$('labor-cultivo').value=l.cultivo||'';
     $('labor-precio').value=l.precio;$('labor-has').value=l.has;
     (l.participantes||[]).forEach(p=>editLaborChips[p.emp]=p.pct);
-  }else{$('modal-labor-titulo').textContent='Nueva labor';$('labor-fecha').value=hoy();
-    $('labor-campo').value='';$('labor-act').value='';$('labor-precio').value='';$('labor-has').value='';}
+  }else{$('modal-labor-titulo').textContent='Nueva labor';$('labor-fecha').value=fechaSesion.labor||hoy();
+    $('labor-campo').value='';$('labor-act').value='';$('labor-cultivo').value='';$('labor-precio').value='';$('labor-has').value='';}
   renderChipsLabor();
+  sugerirPreciosLabor();
   abrir('modal-labor');
 }
 function renderChipsLabor(){
@@ -1120,9 +1134,29 @@ function guardarLabor(){
     return {emp:id,pct,importe:total};
   });
   const id=$('labor-id').value||uid();
-  guardar('labores/'+id,{fecha:$('labor-fecha').value,campo,act,precio,has,participantes},'Labor guardada y repartida');
+  fechaSesion.labor=$('labor-fecha').value;
+  guardar('labores/'+id,{fecha:$('labor-fecha').value,campo,act,cultivo:normalizarCultivo($('labor-cultivo').value),precio,has,participantes},'Labor guardada y repartida');
   cerrar('modal-labor');
 }
+/* precios del historial que se parecen a la actividad, ordenados por cercanía a la fecha */
+function sugerirPreciosLabor(){
+  const box=$('labor-sug-box'), sel=$('labor-sug'); if(!box)return;
+  const act=$('labor-act').value.trim(), cult=normalizarCultivo($('labor-cultivo').value), f=$('labor-fecha').value||hoy();
+  if(!act||!Object.keys(preciosLab).length){box.style.display='none';return;}
+  const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ');
+  const STOP=new Set(['con','de','del','simple','doble','fert','fertil','por','para','la','el','los','las','y']);
+  const palabras=s=>norm(s).split(/\s+/).filter(w=>w.length>=3&&!STOP.has(w));
+  const pa=palabras(act);
+  let arr=Object.values(preciosLab).filter(p=>{const pb=palabras(p.labor);return pa.some(w=>pb.includes(w));});
+  if(cult){const c=arr.filter(p=>(p.cultivo||'')===cult);if(c.length)arr=c;}
+  const t=new Date(f).getTime();
+  arr.sort((a,b)=>Math.abs(new Date(a.fecha).getTime()-t)-Math.abs(new Date(b.fecha).getTime()-t));
+  if(!arr.length){box.style.display='none';return;}
+  sel.innerHTML='<option value="">— elegir un precio cargado —</option>'+arr.slice(0,12).map(p=>
+    `<option value="${p.importe}">${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.rinde?' · rinde '+num2(p.rinde):''}</option>`).join('');
+  box.style.display='block';
+}
+function usarPrecioSug(){const v=$('labor-sug').value;if(v){$('labor-precio').value=v;previewLabor();toast('Precio copiado (podés ajustarlo)');}}
 function borrarLabor(id){if(confirm('¿Eliminar esta labor?')){borrarRegistro('labores/'+id,'Labor eliminada');}}
 
 /* =================== SERVICIO GANADERO =================== */
@@ -1215,7 +1249,7 @@ function valoresUsados(tipo){
   if(tipo==='lotesNom'){const e=($('lo-estab')?$('lo-estab').value.trim().toUpperCase():'');Object.values(lotes).forEach(l=>{if(l.lote&&(!e||l.estab===e))set.add(l.lote);});}
   if(tipo==='maqs')Object.values(lotes).forEach(l=>l.maq&&set.add(l.maq));
   if(tipo==='marcasGasoil')Object.values(gasoil).forEach(g=>g.marca&&set.add(g.marca));
-  if(tipo==='cultivos'){CULTIVOS_BASE.forEach(c=>set.add(c));Object.values(preciosLab).forEach(p=>p.cultivo&&set.add(p.cultivo));Object.values(lotes).forEach(l=>l.cultivo&&set.add(l.cultivo));}
+  if(tipo==='cultivos'){CULTIVOS_BASE.forEach(c=>set.add(c));Object.values(preciosLab).forEach(p=>p.cultivo&&set.add(p.cultivo));Object.values(lotes).forEach(l=>l.cultivo&&set.add(l.cultivo));Object.values(labores).forEach(l=>l.cultivo&&set.add(l.cultivo));}
   if(tipo==='itemsgan'){
     ITEMS_GAN_BASE.forEach(a=>set.add(a));
     Object.values(ganaderos).forEach(g=>(g.items||[]).forEach(i=>i.desc&&set.add(i.desc)));
@@ -1236,6 +1270,7 @@ function elegirSug(div,inputId){
   div.parentElement.style.display='none';
   const m=inputId.match(/^gi-desc-(\d+)$/);
   if(m) cambiarItem(parseInt(m[1]),'desc',inp.value);
+  if(inputId==='labor-act'||inputId==='labor-cultivo') sugerirPreciosLabor();
 }
 
 /* =================== SELECTS / FILTROS =================== */
@@ -1290,6 +1325,8 @@ function entreFechas(f,d,h){if(d&&f<d)return false;if(h&&f>h)return false;return
 function render(){
   if($('app').style.display==='none')return;
   llenarFiltros();
+  llenarFiltrosLotes();
+  aplicarFiltrosGuardados();
   renderDashboard();
   renderLabores();
   renderPagos();
@@ -1300,6 +1337,7 @@ function render(){
   renderPrecios();
   renderGasoil();
   renderCobros();
+  guardarFiltros();
 }
 
 /* =================== DASHBOARD =================== */
@@ -1522,7 +1560,7 @@ function renderLabores(){
     return `<div class="registro labor">
       <div class="reg-info">
         <div class="reg-top"><span class="etiqueta et-labor">Labor</span><span class="reg-titulo">${l.act}</span></div>
-        <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🌾 ${l.campo||'—'} · ${l.has} ha × ${plata(l.precio)}/ha</div>
+        <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🌾 ${l.campo||'—'}${l.cultivo?' · 🌱 '+l.cultivo:''} · ${l.has} ha × ${plata(l.precio)}/ha</div>
         <div class="reg-obs">👥 ${nombres}</div>
         <div class="reg-acc">
           <button class="icono-btn" onclick="abrirModalLabor('${id}')">✏️</button>
@@ -1603,6 +1641,42 @@ function renderPestanas(){
 }
 function seleccionarEmp(id){empSeleccionado=id;renderPestanas();renderCuenta();}
 
+
+
+/* =================== FILTROS PERSISTENTES (se conservan al cerrar y abrir) =================== */
+const IDS_FILTROS=['fl-desde','fl-hasta','fl-act','fl-emp','fl-txt','fp-desde','fp-hasta','fp-cat','fp-emp','fp-txt',
+  'fc-desde','fc-hasta','fc-tipo','fc-act','fc-txt','fd-mes','fd-desde','fd-hasta','fd-emp',
+  'lf-desde','lf-hasta','lf-estab','lf-labor','lf-estado','lf-maq','lf-cultivo','lf-txt'];
+let filtrosGuardados=null, filtrosRestaurados=false;
+try{filtrosGuardados=JSON.parse(localStorage.getItem('mestizo_filtros')||'null');}catch(e){filtrosGuardados=null;}
+function guardarFiltros(){
+  if(!filtrosRestaurados)return;
+  try{
+    const o={v:{},abiertos:[],vista:document.querySelector('nav.principal button.activo')?.dataset.vista||'labores',
+      ltPlanilla,ltSub,empSeleccionado};
+    IDS_FILTROS.forEach(id=>{const el=$(id);if(el)o.v[id]=el.value;});
+    document.querySelectorAll('details.filtros').forEach((d,i)=>{if(d.open)o.abiertos.push(i);});
+    localStorage.setItem('mestizo_filtros',JSON.stringify(o));
+  }catch(e){}
+}
+function aplicarFiltrosGuardados(){
+  if(filtrosRestaurados||!filtrosGuardados)return;
+  const g=filtrosGuardados;
+  IDS_FILTROS.forEach(id=>{const el=$(id);if(el&&g.v&&g.v[id]!==undefined){el.value=g.v[id];}});
+  document.querySelectorAll('details.filtros').forEach((d,i)=>{d.open=(g.abiertos||[]).includes(i);});
+}
+function chequearRestauracion(){ if(cargadoLt.lotes&&cargadoLt.precios&&cargadoLt.tipos) setTimeout(terminarRestauracion,300); }
+function terminarRestauracion(){
+  if(filtrosRestaurados)return;
+  filtrosRestaurados=true;
+  if(!filtrosGuardados)return;
+  const g=filtrosGuardados;
+  if(g.ltPlanilla)ltPlanilla=g.ltPlanilla;
+  if(g.empSeleccionado&&(g.empSeleccionado==='__todos__'||empleados[g.empSeleccionado]))empSeleccionado=g.empSeleccionado;
+  if(g.vista){const b=document.querySelector(`nav.principal button[data-vista="${g.vista}"]`);if(b)irVista(g.vista,b);}
+  if(g.ltSub){const b=document.querySelector(`.subpills button[data-sub="${g.ltSub}"]`);if(b)irSub(g.ltSub,b);}
+  render();
+}
 
 /* =================== LOTES Y LABORES =================== */
 const LABORES_BASE=[
@@ -1692,7 +1766,7 @@ function claseReg(pl){return pl==='BERNARDO'?'':(pl==='PROPIO'?' pro':' gen');}
 function esCosecha(l){return /cosecha/i.test(l||'');}
 
 function irSub(s,btn){
-  ltSub=s;
+  ltSub=s; setTimeout(guardarFiltros,0);
   ['registros','precios','gasoil','calc','cobros'].forEach(x=>{$('lt-'+x).style.display=(x===s?'block':'none');});
   document.querySelectorAll('.subpills button').forEach(b=>b.classList.remove('activa'));
   if(btn)btn.classList.add('activa');
@@ -1799,7 +1873,7 @@ function abrirModalLote(id){
   const l=id?lotes[id]:null;
   $('modal-lote-titulo').textContent=l?'Editar labor por lote':'Nueva labor por lote';
   $('lo-planilla').value=l?l.planilla:(ltPlanilla!=='__todas__'?ltPlanilla:'GENERAL');
-  $('lo-fecha').value=l?l.fecha:hoy();
+  $('lo-fecha').value=l?l.fecha:(fechaSesion.lote||hoy());
   $('lo-estab').value=l?l.estab||'':'';
   $('lo-lote').value=l?l.lote||'':'';
   $('lo-labor').value=l?l.labor:listaLabores()[0].n;
@@ -1833,6 +1907,7 @@ function guardarLote(){
   if($('lo-fact').value!=='')obj.fact=parseFloat($('lo-fact').value)||0;
   if(!obj.cultivo)obj.cultivo=cultivoDesdeObsLote(obj.obs);
   const id=$('lo-id').value||uid();
+  fechaSesion.lote=fecha;
   guardar('lotes/'+id,obj,'Labor guardada');
   cerrar('modal-lote');
 }
@@ -2382,7 +2457,7 @@ function armarHTMLResumen(){
     (l.participantes||[]).forEach(p=>{
       if(filtroEmp==='__todos__'||p.emp===filtroEmp){
         regs.push({tipo:'labor',fecha:l.fecha,emp:p.emp,titulo:l.act,
-          detalle:`${l.campo||'—'} · ${l.has} ha · ${p.pct}%`,monto:p.importe});
+          detalle:`${l.campo||'—'}${l.cultivo?' · '+l.cultivo:''} · ${l.has} ha`,monto:p.importe});
         gana+=p.importe;
       }
     });
@@ -2698,7 +2773,7 @@ function renderCuenta(){
       (l.participantes||[]).forEach(p=>{
         if(filtroEmp==='__todos__'||p.emp===filtroEmp){
           regs.push({tipo:'labor',fecha:l.fecha,emp:p.emp,titulo:l.act,
-            meta:`🌾 ${l.campo||'—'} · ${l.has} ha · ${p.pct}%`,monto:p.importe,id});
+            meta:`🌾 ${l.campo||'—'}${l.cultivo?' · 🌱 '+l.cultivo:''} · ${l.has} ha · ${p.pct}%`,monto:p.importe,id});
           gana+=p.importe;
         }
       });

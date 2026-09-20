@@ -660,7 +660,7 @@
     <input type="hidden" id="labor-id">
     <div class="fila2">
       <div class="campo-form"><label>Fecha</label><input type="date" id="labor-fecha" onchange="sugerirPreciosLabor()"></div>
-      <div class="campo-form"><label>Nombre del campo</label><input id="labor-campo" placeholder="Ej: La Esperanza"></div>
+      <div class="campo-form autobox"><label>Nombre del campo</label><input id="labor-campo" autocomplete="off" placeholder="Ej: La Esperanza" oninput="autocompletar(this,'estabs')" onfocus="autocompletar(this,'estabs')"><div class="sugerencias"></div></div>
     </div>
     <div class="campo-form autobox">
       <label>Actividad</label>
@@ -905,7 +905,7 @@
 let db=null, firebaseOK=false;
 let empleados={}, pagos={}, labores={}, ganaderos={};
 let lotes={}, preciosLab={}, gasoil={}, cobros={}, tiposLabor={};
-let cargadoLt={lotes:false,precios:false,tipos:false}, migracionLtHecha=false;
+let cargadoLt={lotes:false,precios:false,tipos:false,labores:false,cobros:false}, migracionLtHecha=false;
 let ltPlanilla='__todas__', ltSub='registros', ltMostrar=120;
 let empSeleccionado='__todos__';
 let fechaSesion={};  // última fecha usada por tipo de carga (solo mientras la app está abierta)
@@ -975,14 +975,14 @@ function escucharDatos(){
   const mostrar=()=>{ if(!listo){listo=true; $('cargando').style.display='none'; $('app').style.display='block'; render();} };
   db.ref('empleados').on('value',s=>{empleados=s.val()||{};render();mostrar();});
   db.ref('pagos').on('value',s=>{pagos=s.val()||{};render();mostrar();});
-  db.ref('labores').on('value',s=>{labores=s.val()||{};render();mostrar();});
+  db.ref('labores').on('value',s=>{labores=s.val()||{};cargadoLt.labores=true;render();mostrar();chequearMigracionLt();});
   db.ref('ganaderos').on('value',s=>{ganaderos=s.val()||{};render();mostrar();});
   db.ref('lotes').on('value',s=>{lotes=s.val()||{};cargadoLt.lotes=true;render();chequearMigracionLt();});
   db.ref('preciosLab').on('value',s=>{preciosLab=s.val()||{};cargadoLt.precios=true;render();chequearMigracionLt();});
   db.ref('tiposLabor').on('value',s=>{tiposLabor=s.val()||{};cargadoLt.tipos=true;render();chequearMigracionLt();chequearRestauracion();});
   setTimeout(terminarRestauracion,6000); // por si alguna colección tarda
   db.ref('gasoil').on('value',s=>{gasoil=s.val()||{};render();});
-  db.ref('cobros').on('value',s=>{cobros=s.val()||{};render();});
+  db.ref('cobros').on('value',s=>{cobros=s.val()||{};cargadoLt.cobros=true;render();chequearMigracionLt();});
   setTimeout(mostrar,4000);
 }
 
@@ -1121,7 +1121,7 @@ function previewLabor(){
   body.innerHTML=html;box.style.display='block';
 }
 function guardarLabor(){
-  const campo=$('labor-campo').value.trim(), act=capitalizar($('labor-act').value.trim());
+  const campo=titulo($('labor-campo').value), act=capitalizar($('labor-act').value.trim());
   const precio=parseFloat($('labor-precio').value)||0, has=parseFloat($('labor-has').value)||0;
   const ids=Object.keys(editLaborChips);
   if(!act){toast('Poné la actividad');return;}
@@ -1234,6 +1234,15 @@ function borrarGan(id){if(confirm('¿Eliminar este servicio ganadero?')){borrarR
 
 /* =================== AUTOCOMPLETE =================== */
 function capitalizar(s){ s=(s||'').trim(); return s? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+/* "CUADRADO ENRIQUE" → "Cuadrado Enrique" (respeta números romanos y siglas con punto) */
+function titulo(s){
+  s=(s||'').trim().replace(/\s+/g,' ');
+  return s.split(' ').map(w=>{
+    if(/^[IVXLC]+$/i.test(w))return w.toUpperCase();
+    if(/\./.test(w))return w.toUpperCase();
+    return w.toLowerCase().replace(/(^|['’(\-])(\p{L})/gu,(m,p,c)=>p+c.toUpperCase());
+  }).join(' ');
+}
 
 /* actividades que vienen precargadas desde el arranque */
 const ACTIVIDADES_BASE=['Cosecha','Siembra con s/f','Siembra con d/f','Disco con rolo','Rolo picador','Embolsado','Extracción de cereal','Carrero de cosecha','Desmalezada','Terraplenar'];
@@ -1245,8 +1254,8 @@ function valoresUsados(tipo){
     ACTIVIDADES_BASE.forEach(a=>set.add(a));
     Object.values(labores).forEach(l=>l.act&&set.add(l.act));
   }
-  if(tipo==='estabs'){Object.values(lotes).forEach(l=>l.estab&&set.add(l.estab));Object.values(cobros).forEach(c=>c.estab&&set.add(c.estab));}
-  if(tipo==='lotesNom'){const e=($('lo-estab')?$('lo-estab').value.trim().toUpperCase():'');Object.values(lotes).forEach(l=>{if(l.lote&&(!e||l.estab===e))set.add(l.lote);});}
+  if(tipo==='estabs'){Object.values(lotes).forEach(l=>l.estab&&set.add(l.estab));Object.values(cobros).forEach(c=>c.estab&&set.add(c.estab));Object.values(labores).forEach(l=>l.campo&&set.add(l.campo));}
+  if(tipo==='lotesNom'){const e=titulo($('lo-estab')?$('lo-estab').value:'');Object.values(lotes).forEach(l=>{if(l.lote&&(!e||l.estab===e))set.add(l.lote);});}
   if(tipo==='maqs')Object.values(lotes).forEach(l=>l.maq&&set.add(l.maq));
   if(tipo==='marcasGasoil')Object.values(gasoil).forEach(g=>g.marca&&set.add(g.marca));
   if(tipo==='cultivos'){CULTIVOS_BASE.forEach(c=>set.add(c));Object.values(preciosLab).forEach(p=>p.cultivo&&set.add(p.cultivo));Object.values(lotes).forEach(l=>l.cultivo&&set.add(l.cultivo));Object.values(labores).forEach(l=>l.cultivo&&set.add(l.cultivo));}
@@ -1727,7 +1736,7 @@ function listaLabores(){
 function unidadLabor(n){const l=listaLabores().find(x=>x.n===n);return l?l.u:'ha';}
 /* migración automática (una sola vez): renombra la cosecha y crea los tipos editables */
 function chequearMigracionLt(){
-  if(migracionLtHecha||!firebaseOK||!(cargadoLt.lotes&&cargadoLt.precios&&cargadoLt.tipos))return;
+  if(migracionLtHecha||!firebaseOK||!(cargadoLt.lotes&&cargadoLt.precios&&cargadoLt.tipos&&cargadoLt.labores&&cargadoLt.cobros))return;
   migracionLtHecha=true;
   const up={}; let n=0;
   Object.entries(lotes).forEach(([id,l])=>{if(l.labor===NOMBRE_VIEJO_COSECHA){up['lotes/'+id+'/labor']='Cosecha';n++;}});
@@ -1738,6 +1747,13 @@ function chequearMigracionLt(){
     const extra=[...new Set(Object.values(lotes).map(l=>l.labor).filter(x=>x&&x!==NOMBRE_VIEJO_COSECHA&&!LABORES_BASE.some(b=>b.n===x)))];
     extra.forEach((x,i)=>{up['tiposLabor/tlx'+(i+1)]={n:x,u:'ha',orden:100+i};});
   }
+  // nombres de establecimiento: unificar "CUADRADO" y pasar todo a formato "Cuadrado Enrique"
+  const ESTAB_FIX={'CUADRADO':'Cuadrado Enrique'};
+  let ne=0;
+  const arreglar=v=>{const k=(v||'').trim().toUpperCase();return ESTAB_FIX[k]||titulo(v);};
+  Object.entries(lotes).forEach(([id,l])=>{if(l.estab){const n2=arreglar(l.estab);if(n2!==l.estab){up['lotes/'+id+'/estab']=n2;ne++;}}});
+  Object.entries(cobros).forEach(([id,c])=>{if(c.estab){const n2=arreglar(c.estab);if(n2!==c.estab){up['cobros/'+id+'/estab']=n2;ne++;}}});
+  Object.entries(labores).forEach(([id,l])=>{if(l.campo){const n2=arreglar(l.campo);if(n2!==l.campo){up['labores/'+id+'/campo']=n2;ne++;}}});
   // cultivo en registros de lote: detectar desde la observación (la observación se conserva)
   let nlc=0;
   Object.entries(lotes).forEach(([id,l])=>{
@@ -1755,7 +1771,7 @@ function chequearMigracionLt(){
   });
   if(Object.keys(up).length){
     db.ref().update(up).then(()=>{
-      const msgs=[]; if(n)msgs.push(`${n} renombrados a "Cosecha"`); if(nlc)msgs.push(`cultivo detectado en ${nlc} registros de lote`); if(nc)msgs.push(`cultivo asignado a ${nc} precios`);
+      const msgs=[]; if(n)msgs.push(`${n} renombrados a "Cosecha"`); if(ne)msgs.push(`${ne} nombres de establecimiento normalizados`); if(nlc)msgs.push(`cultivo detectado en ${nlc} registros de lote`); if(nc)msgs.push(`cultivo asignado a ${nc} precios`);
       if(msgs.length)toast(msgs.join(' · '));
     }).catch(()=>{});
   }
@@ -1896,7 +1912,7 @@ function difLote(){
     `Diferencia monitor − facturar: <b class="${(c-f)>0?'dif-mal':'dif-ok'}">${num2(c-f)} ${u}</b>`;
 }
 function guardarLote(){
-  const fecha=$('lo-fecha').value, estab=$('lo-estab').value.trim().toUpperCase();
+  const fecha=$('lo-fecha').value, estab=titulo($('lo-estab').value);
   if(!fecha){toast('Poné la fecha');return;}
   if(!estab){toast('Poné el establecimiento');return;}
   const cant=parseFloat($('lo-cant').value)||0;
@@ -2154,7 +2170,7 @@ function abrirModalCobro(id){
   abrir('modal-cobro');
 }
 function guardarCobro(){
-  const fecha=$('co-fecha').value, importe=parseFloat($('co-importe').value)||0, estab=$('co-estab').value.trim().toUpperCase();
+  const fecha=$('co-fecha').value, importe=parseFloat($('co-importe').value)||0, estab=titulo($('co-estab').value);
   if(!fecha){toast('Poné la fecha');return;}
   if(!estab){toast('Poné el establecimiento');return;}
   if(!importe){toast('Poné el importe');return;}

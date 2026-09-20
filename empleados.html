@@ -247,7 +247,7 @@
   .modal-bg.abierto{display:flex}
   .modal{background:var(--crema);width:100%;max-width:520px;border-radius:18px 18px 0 0;
     padding:0 18px 28px;max-height:90vh;overflow-y:auto;animation:sube .25s ease;position:relative}
-  @media(min-width:560px){.modal-bg{align-items:center}.modal{border-radius:18px}}
+  @media(min-width:560px){.modal-bg{align-items:center}.modal{border-radius:18px}.modal-head{cursor:grab;user-select:none}}
   @keyframes sube{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
   .modal.ancho{max-width:980px}
   .tabla-fac{min-width:720px}
@@ -617,7 +617,17 @@
     <input type="hidden" id="emp-id">
     <div class="campo-form"><label>Nombre</label><input id="emp-nombre" placeholder="Ej: Casco"></div>
     <div class="campo-form"><label>CUIT / CUIL</label><input id="emp-cuit" placeholder="Ej: 20-12345678-3" maxlength="13"></div>
-    <div class="campo-form"><label>Porcentaje fijo (%)</label><input type="number" id="emp-pct" step="0.01" placeholder="Ej: 8"></div>
+    <div class="campo-form"><label>Porcentaje fijo (%)</label><input type="number" id="emp-pct" step="0.01" placeholder="Ej: 8" oninput="mostrarRetro()"></div>
+    <div class="tarjeta" id="emp-retro" style="display:none;padding:10px 14px;background:#fff7e0;border-color:var(--trigo)">
+      <label style="display:flex;gap:10px;align-items:center;font-size:14px"><input type="checkbox" id="emp-retro-on" class="fa-check" onchange="mostrarRetro()"> Aplicar el nuevo porcentaje a labores ya cargadas</label>
+      <div id="emp-retro-rango" style="display:none;margin-top:8px">
+        <div class="fila2">
+          <div class="campo-form" style="margin:0"><label>Desde</label><input type="date" id="emp-retro-desde" onchange="mostrarRetro()"></div>
+          <div class="campo-form" style="margin:0"><label>Hasta</label><input type="date" id="emp-retro-hasta" onchange="mostrarRetro()"></div>
+        </div>
+        <div class="sub" id="emp-retro-info" style="margin-top:6px"></div>
+      </div>
+    </div>
     <div class="campo-form"><label>Estado</label>
       <select id="emp-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo (se fue)</option></select>
     </div>
@@ -659,13 +669,17 @@
     </div>
     <input type="hidden" id="labor-id">
     <div class="fila2">
-      <div class="campo-form"><label>Fecha</label><input type="date" id="labor-fecha" onchange="sugerirPreciosLabor()"></div>
-      <div class="campo-form autobox"><label>Nombre del campo</label><input id="labor-campo" autocomplete="off" placeholder="Ej: La Esperanza" oninput="autocompletar(this,'estabs')" onfocus="autocompletar(this,'estabs')"><div class="sugerencias"></div></div>
+      <div class="campo-form"><label>Fecha</label><input type="date" id="labor-fecha" onchange="sugerirPreciosLabor();sugerirDesdeLotes()"></div>
+      <div class="campo-form autobox"><label>Nombre del campo</label><input id="labor-campo" autocomplete="off" placeholder="Ej: La Esperanza" oninput="autocompletar(this,'estabs');sugerirDesdeLotes()" onfocus="autocompletar(this,'estabs')" onblur="setTimeout(sugerirDesdeLotes,250)"><div class="sugerencias"></div></div>
     </div>
     <div class="campo-form autobox">
       <label>Actividad</label>
       <input id="labor-act" autocomplete="off" placeholder="Ej: siembra con s/f" oninput="autocompletar(this,'actividades');sugerirPreciosLabor()" onfocus="autocompletar(this,'actividades')" onblur="setTimeout(sugerirPreciosLabor,250)">
       <div class="sugerencias" id="sug-labor-act"></div>
+    </div>
+    <div id="labor-lotes-sug" style="display:none;margin:-6px 0 12px">
+      <div class="sub" style="margin-bottom:5px;font-size:12px" id="labor-lotes-sug-t"></div>
+      <div id="labor-lotes-sug-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
     <div class="campo-form autobox">
       <label>Cultivo (opcional)</label>
@@ -770,7 +784,10 @@
       <div class="campo-form"><label id="pr-importe-lbl">Importe ($ por ha)</label><input type="number" id="pr-importe" step="0.01" placeholder="0"></div>
       <div class="campo-form" id="pr-rinde-box" style="display:none"><label>Rinde (tn/ha)</label><input type="number" id="pr-rinde" step="0.1" placeholder="Ej: 7,1"></div>
     </div>
-    <div class="campo-form autobox"><label>Cultivo (opcional)</label><input id="pr-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío, Soja 2da…" oninput="autocompletar(this,'cultivos')" onfocus="autocompletar(this,'cultivos')"><div class="sugerencias"></div></div>
+    <div class="fila2">
+      <div class="campo-form autobox"><label>Cultivo (opcional)</label><input id="pr-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío…" oninput="autocompletar(this,'cultivos')" onfocus="autocompletar(this,'cultivos')"><div class="sugerencias"></div></div>
+      <div class="campo-form autobox"><label>Establecimiento (opcional)</label><input id="pr-estab" autocomplete="off" placeholder="Ej: La Vasca" oninput="autocompletar(this,'estabs')" onfocus="autocompletar(this,'estabs')"><div class="sugerencias"></div></div>
+    </div>
     <div class="campo-form"><label>Observaciones</label><input id="pr-obs" placeholder="Opcional (cliente, factura, etc.)"></div>
     <button class="btn" onclick="guardarPrecio()">Guardar</button>
     <button class="btn-cancelar" onclick="cerrar('modal-precio')">Cancelar</button>
@@ -1006,7 +1023,35 @@ function irVista(v,btn){
 }
 
 /* =================== MODALES =================== */
-function abrir(id){$(id).classList.add('abierto');}
+let posModales={};
+try{posModales=JSON.parse(localStorage.getItem('mestizo_posmodal')||'{}');}catch(e){posModales={};}
+function abrir(id){
+  const m=$(id); m.classList.add('abierto');
+  const box=m.querySelector('.modal');
+  if(box){
+    box.scrollTop=0;
+    const p=posModales[id];
+    box.style.transform=(p&&window.innerWidth>=560)?`translate(${p.x}px,${p.y}px)`:'';
+    box.style.animation=(p&&window.innerWidth>=560)?'none':'';
+  }
+}
+/* arrastrar el modal desde su cabecera (PC) y recordar la posición */
+document.addEventListener('mousedown',e=>{
+  if(window.innerWidth<560)return;
+  const head=e.target.closest('.modal-head'); if(!head||e.target.closest('button'))return;
+  const box=head.closest('.modal'), bg=box.parentElement; const id=bg.id;
+  const p=posModales[id]||{x:0,y:0}; const sx=e.clientX-p.x, sy=e.clientY-p.y;
+  box.style.animation='none'; head.style.cursor='grabbing';
+  const mover=ev=>{const x=ev.clientX-sx, y=ev.clientY-sy; box.style.transform=`translate(${x}px,${y}px)`; posModales[id]={x,y};};
+  const soltar=()=>{document.removeEventListener('mousemove',mover);document.removeEventListener('mouseup',soltar);head.style.cursor='';
+    try{localStorage.setItem('mestizo_posmodal',JSON.stringify(posModales));}catch(err){}};
+  document.addEventListener('mousemove',mover); document.addEventListener('mouseup',soltar); e.preventDefault();
+});
+document.addEventListener('dblclick',e=>{ // doble clic en la cabecera: volver al centro
+  const head=e.target.closest('.modal-head'); if(!head||e.target.closest('button'))return;
+  const box=head.closest('.modal'); delete posModales[box.parentElement.id]; box.style.transform='';
+  try{localStorage.setItem('mestizo_posmodal',JSON.stringify(posModales));}catch(err){}
+});
 function cerrar(id){$(id).classList.remove('abierto');document.querySelectorAll('.sugerencias').forEach(s=>s.style.display='none');}
 /* cerrar tocando el fondo oscuro o con Escape */
 document.querySelectorAll('.modal-bg').forEach(bg=>{
@@ -1017,10 +1062,26 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.querySelec
 /* ---- Empleado ---- */
 function abrirModalEmp(id){
   $('emp-id').value=id||'';
+  $('emp-retro-on').checked=false;$('emp-retro-desde').value='';$('emp-retro-hasta').value='';
   if(id){const e=empleados[id];$('modal-emp-titulo').textContent='Editar trabajador';
     $('emp-nombre').value=e.nombre;$('emp-cuit').value=e.cuit||'';$('emp-pct').value=e.pct;$('emp-estado').value=e.estado||'activo';}
   else{$('modal-emp-titulo').textContent='Nuevo trabajador';$('emp-nombre').value='';$('emp-cuit').value='';$('emp-pct').value='';$('emp-estado').value='activo';}
+  mostrarRetro();
   abrir('modal-emp');
+}
+function laboresDelEmp(id,d,h){
+  return Object.entries(labores).filter(([lid,l])=>entreFechas(l.fecha,d,h)&&(l.participantes||[]).some(p=>p.emp===id));
+}
+function mostrarRetro(){
+  const id=$('emp-id').value; const box=$('emp-retro'); if(!box)return;
+  const pctNuevo=parseFloat($('emp-pct').value);
+  const cambia=!!(id&&empleados[id]&&!isNaN(pctNuevo)&&pctNuevo!==(empleados[id].pct||0));
+  box.style.display=cambia?'block':'none';
+  $('emp-retro-rango').style.display=$('emp-retro-on').checked?'block':'none';
+  if(cambia&&$('emp-retro-on').checked){
+    const n=laboresDelEmp(id,$('emp-retro-desde').value,$('emp-retro-hasta').value).length;
+    $('emp-retro-info').textContent=`Se recalcularán ${n} labor(es) con ${pctNuevo}% (se mantiene el reparto entre los trabajadores de cada labor).`;
+  }
 }
 function guardarEmp(){
   const nombre=$('emp-nombre').value.trim();
@@ -1029,7 +1090,17 @@ function guardarEmp(){
   if(!nombre){toast('Poné un nombre');return;}
   const id=$('emp-id').value||uid();
   const orden=$('emp-id').value?(empleados[id].orden||Date.now()):Date.now();
-  guardar('empleados/'+id,{nombre,cuit,pct,estado:$('emp-estado').value,orden},'Trabajador guardado');
+  const up={}; up['empleados/'+id]={nombre,cuit,pct,estado:$('emp-estado').value,orden};
+  let nRe=0;
+  if($('emp-id').value&&$('emp-retro-on').checked&&pct!==(empleados[id].pct||0)){
+    laboresDelEmp(id,$('emp-retro-desde').value,$('emp-retro-hasta').value).forEach(([lid,l])=>{
+      const n=(l.participantes||[]).length;
+      const parts=l.participantes.map(p=>{const pc=p.emp===id?pct:p.pct;return {emp:p.emp,pct:pc,importe:((l.precio*pc/100)/n)*l.has};});
+      up['labores/'+lid+'/participantes']=parts; nRe++;
+    });
+    if(nRe&&!confirm(`Se va a cambiar el porcentaje a ${pct}% y recalcular ${nRe} labor(es) ya cargadas. ¿Continuar?`))return;
+  }
+  guardarVarios(up,nRe?`Trabajador guardado · ${nRe} labores recalculadas`:'Trabajador guardado');
   cerrar('modal-emp');
 }
 function toggleEstado(id){
@@ -1079,6 +1150,7 @@ function abrirModalLabor(id){
     $('labor-campo').value='';$('labor-act').value='';$('labor-cultivo').value='';$('labor-precio').value='';$('labor-has').value='';}
   renderChipsLabor();
   sugerirPreciosLabor();
+  sugerirDesdeLotes();
   abrir('modal-labor');
 }
 function renderChipsLabor(){
@@ -1149,12 +1221,34 @@ function sugerirPreciosLabor(){
   const pa=palabras(act);
   let arr=Object.values(preciosLab).filter(p=>{const pb=palabras(p.labor);return pa.some(w=>pb.includes(w));});
   if(cult){const c=arr.filter(p=>(p.cultivo||'')===cult);if(c.length)arr=c;}
-  const t=new Date(f).getTime();
-  arr.sort((a,b)=>Math.abs(new Date(a.fecha).getTime()-t)-Math.abs(new Date(b.fecha).getTime()-t));
+  const t=new Date(f).getTime(), est=titulo($('labor-campo').value);
+  arr.sort((a,b)=>{const ea=(est&&a.estab===est)?0:1, eb=(est&&b.estab===est)?0:1; if(ea!==eb)return ea-eb;
+    return Math.abs(new Date(a.fecha).getTime()-t)-Math.abs(new Date(b.fecha).getTime()-t);});
   if(!arr.length){box.style.display='none';return;}
   sel.innerHTML='<option value="">— elegir un precio cargado —</option>'+arr.slice(0,12).map(p=>
-    `<option value="${p.importe}">${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.rinde?' · rinde '+num2(p.rinde):''}</option>`).join('');
+    `<option value="${p.importe}">${(est&&p.estab===est)?'★ ':''}${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''}${p.estab?' · '+p.estab:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.rinde?' · rinde '+num2(p.rinde):''}</option>`).join('');
   box.style.display='block';
+}
+/* registros de Lotes y labores del mismo establecimiento, cercanos a la fecha */
+let lotesSugCache=[];
+function sugerirDesdeLotes(){
+  const box=$('labor-lotes-sug'); if(!box)return;
+  const est=titulo($('labor-campo').value), f=$('labor-fecha').value||hoy();
+  if(!est){box.style.display='none';return;}
+  const t=new Date(f).getTime();
+  lotesSugCache=Object.values(lotes).filter(l=>l.estab===est).map(l=>({...l,d:Math.abs(new Date(l.fecha).getTime()-t)}))
+    .sort((a,b)=>a.d-b.d).slice(0,8);
+  if(!lotesSugCache.length){box.style.display='none';return;}
+  $('labor-lotes-sug-t').textContent=`En Lotes y labores para ${est} (más cercano al ${fechaLinda(f)} primero) · tocá para completar:`;
+  $('labor-lotes-sug-chips').innerHTML=lotesSugCache.map((l,i)=>`<button type="button" class="btn peq linea" style="width:auto;padding:5px 9px;font-size:12px;margin:0" onclick="usarLoteSug(${i})">${fechaLinda(l.fecha)} · ${l.labor}${l.cultivo?' · '+l.cultivo:''}${l.lote?' · L.'+l.lote:''} · ${num2(l.cant)} ${unidadLabor(l.labor)}</button>`).join('');
+  box.style.display='block';
+}
+function usarLoteSug(i){
+  const l=lotesSugCache[i]; if(!l)return;
+  $('labor-act').value=l.labor; $('labor-cultivo').value=l.cultivo||'';
+  if(!$('labor-has').value&&unidadLabor(l.labor)==='ha')$('labor-has').value=l.cant||'';
+  if(!$('labor-fecha').value)$('labor-fecha').value=l.fecha;
+  previewLabor(); sugerirPreciosLabor(); toast('Completado desde Lotes y labores (podés ajustarlo)');
 }
 function usarPrecioSug(){const v=$('labor-sug').value;if(v){$('labor-precio').value=v;previewLabor();toast('Precio copiado (podés ajustarlo)');}}
 function borrarLabor(id){if(confirm('¿Eliminar esta labor?')){borrarRegistro('labores/'+id,'Labor eliminada');}}
@@ -1236,7 +1330,7 @@ function borrarGan(id){if(confirm('¿Eliminar este servicio ganadero?')){borrarR
 function capitalizar(s){ s=(s||'').trim(); return s? s.charAt(0).toUpperCase()+s.slice(1) : s; }
 /* "CUADRADO ENRIQUE" → "Cuadrado Enrique" (respeta números romanos y siglas con punto) */
 function titulo(s){
-  s=(s||'').trim().replace(/\s+/g,' ');
+  s=(s||'').replace(/,/g,' ').trim().replace(/\s+/g,' ');
   return s.split(' ').map(w=>{
     if(/^[IVXLC]+$/i.test(w))return w.toUpperCase();
     if(/\./.test(w))return w.toUpperCase();
@@ -1254,7 +1348,7 @@ function valoresUsados(tipo){
     ACTIVIDADES_BASE.forEach(a=>set.add(a));
     Object.values(labores).forEach(l=>l.act&&set.add(l.act));
   }
-  if(tipo==='estabs'){Object.values(lotes).forEach(l=>l.estab&&set.add(l.estab));Object.values(cobros).forEach(c=>c.estab&&set.add(c.estab));Object.values(labores).forEach(l=>l.campo&&set.add(l.campo));}
+  if(tipo==='estabs'){Object.values(lotes).forEach(l=>l.estab&&set.add(l.estab));Object.values(cobros).forEach(c=>c.estab&&set.add(c.estab));Object.values(labores).forEach(l=>l.campo&&set.add(l.campo));Object.values(preciosLab).forEach(p=>p.estab&&set.add(p.estab));}
   if(tipo==='lotesNom'){const e=titulo($('lo-estab')?$('lo-estab').value:'');Object.values(lotes).forEach(l=>{if(l.lote&&(!e||l.estab===e))set.add(l.lote);});}
   if(tipo==='maqs')Object.values(lotes).forEach(l=>l.maq&&set.add(l.maq));
   if(tipo==='marcasGasoil')Object.values(gasoil).forEach(g=>g.marca&&set.add(g.marca));
@@ -1280,6 +1374,7 @@ function elegirSug(div,inputId){
   const m=inputId.match(/^gi-desc-(\d+)$/);
   if(m) cambiarItem(parseInt(m[1]),'desc',inp.value);
   if(inputId==='labor-act'||inputId==='labor-cultivo') sugerirPreciosLabor();
+  if(inputId==='labor-campo') sugerirDesdeLotes();
 }
 
 /* =================== SELECTS / FILTROS =================== */
@@ -2072,7 +2167,7 @@ function renderPrecios(){
   cont.innerHTML=arr.map(([id,p])=>`<div class="registro precio">
       <div class="reg-info">
         <div class="reg-top"><span class="etiqueta et-fact">Precio</span><span class="reg-titulo">${p.labor}</span>${p.cultivo?`<span class="etiqueta et-labor">🌱 ${p.cultivo}</span>`:''}</div>
-        <div class="reg-meta">📅 ${fechaLinda(p.fecha)}${p.rinde?` · 🌽 Rinde ${num2(p.rinde)} tn/ha`:''}${p.obs?' · 📝 '+p.obs:''}</div>
+        <div class="reg-meta">📅 ${fechaLinda(p.fecha)}${p.estab?' · 🏡 '+p.estab:''}${p.rinde?` · 🌽 Rinde ${num2(p.rinde)} tn/ha`:''}${p.obs?' · 📝 '+p.obs:''}</div>
         <div class="reg-acc"><button class="icono-btn" onclick="abrirModalPrecio('${id}')">✏️</button><button class="icono-btn" onclick="borrarPrecio('${id}')">🗑️</button></div>
       </div>
       <div class="reg-monto">${plata(p.importe)}<span style="font-size:11px;font-weight:400">/${unidadLabor(p.labor)}</span></div>
@@ -2093,6 +2188,7 @@ function abrirModalPrecio(id){
   $('pr-importe').value=p?p.importe:'';
   $('pr-rinde').value=p&&p.rinde?p.rinde:'';
   $('pr-cultivo').value=p?p.cultivo||'':'';
+  $('pr-estab').value=p?p.estab||'':'';
   $('pr-obs').value=p?p.obs||'':'';
   ajustarPrecioForm();
   abrir('modal-precio');
@@ -2101,7 +2197,7 @@ function guardarPrecio(){
   const fecha=$('pr-fecha').value, importe=parseFloat($('pr-importe').value)||0;
   if(!fecha){toast('Poné la fecha');return;}
   if(!importe){toast('Poné el importe');return;}
-  const obj={fecha,labor:$('pr-labor').value,importe,cultivo:normalizarCultivo($('pr-cultivo').value),obs:$('pr-obs').value.trim()};
+  const obj={fecha,labor:$('pr-labor').value,importe,cultivo:normalizarCultivo($('pr-cultivo').value),estab:titulo($('pr-estab').value),obs:$('pr-obs').value.trim()};
   if(esCosecha(obj.labor)&&$('pr-rinde').value)obj.rinde=parseFloat($('pr-rinde').value)||0;
   guardar('preciosLab/'+($('pr-id').value||uid()),obj,'Precio guardado');
   cerrar('modal-precio');
@@ -2243,7 +2339,7 @@ function llenarCmpPrecios(){
   const s=$('cmp-precio'); if(!s)return;
   const fl=$('cmp-labor').value, fc=$('cmp-cultivo').value;
   const arr=Object.entries(preciosLab).filter(([id,p])=>(!fl||p.labor===fl)&&(!fc||p.cultivo===fc)).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
-  s.innerHTML=arr.length?arr.map(([id,p])=>`<option value="${id}">${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.obs?' · '+p.obs:''}</option>`).join(''):'<option value="">No hay precios con ese filtro</option>';
+  s.innerHTML=arr.length?arr.map(([id,p])=>`<option value="${id}">${fechaLinda(p.fecha)} · ${p.labor}${p.cultivo?' · '+p.cultivo:''}${p.estab?' · '+p.estab:''} · ${plata(p.importe)}/${unidadLabor(p.labor)}${p.obs?' · '+p.obs:''}</option>`).join(''):'<option value="">No hay precios con ese filtro</option>';
 }
 function agregarCmp(){
   const id=$('cmp-precio').value; if(!id){toast('Elegí un precio del historial');return;}

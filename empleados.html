@@ -1402,10 +1402,10 @@ function llenarFiltros(){
   [$('fl-emp'),$('fp-emp'),$('fd-emp')].forEach(s=>{if(!s)return;const v=s.value;llenarSelectEmpleados(s,true);s.value=v;});
   // actividades
   const acts=valoresUsados('actividades');
-  $('fl-act').innerHTML='<option value="">Todas</option>'+acts.map(a=>`<option>${a}</option>`).join('');
+  {const va=$('fl-act').value;$('fl-act').innerHTML='<option value="">Todas</option>'+acts.map(a=>`<option>${a}</option>`).join('');$('fl-act').value=va;}
   // categorias
   const cats=valoresUsados('categorias');
-  $('fp-cat').innerHTML='<option value="">Todas</option>'+cats.map(c=>`<option>${c}</option>`).join('');
+  {const vc=$('fp-cat').value;$('fp-cat').innerHTML='<option value="">Todas</option>'+cats.map(c=>`<option>${c}</option>`).join('');$('fp-cat').value=vc;}
   // por empleado: campos + actividades combinados
   if($('fc-act')){
     const campos=[...new Set(Object.values(labores).map(l=>l.campo).filter(Boolean))].sort();

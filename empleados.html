@@ -202,6 +202,8 @@
     .item-gan .monto-gan{flex:1}
   }
   .et-gan{background:#e7f0fa;color:#1c4c7c}
+  .et-ajuste{background:#efe6f7;color:#5b3d8a}
+  .registro.ajuste{border-left-color:#8a63b8}
   /* ---------- LOTES Y LABORES ---------- */
   .et-plan-b{background:#fbe9c9;color:#8a5a00}
   .et-plan-g{background:#e3efe4;color:#2f5d34}
@@ -451,7 +453,7 @@
           <div class="campo-form"><label>Hasta</label><input type="date" id="fc-hasta"></div>
         </div>
         <div class="fila2">
-          <div class="campo-form"><label>Tipo</label><select id="fc-tipo"><option value="">Labores y pagos</option><option value="labor">Solo labores (lo que ganó)</option><option value="pago">Solo pagos (lo entregado)</option></select></div>
+          <div class="campo-form"><label>Tipo</label><select id="fc-tipo"><option value="">Labores y pagos</option><option value="labor">Solo labores (lo que ganó)</option><option value="pago">Solo pagos (lo entregado)</option><option value="ajuste">Solo ajustes</option></select></div>
           <div class="campo-form"><label>Campo / Actividad</label><select id="fc-act"><option value="">Todos</option></select></div>
         </div>
         <div class="campo-form"><label>Buscar texto (campo / actividad / observaciones)</label><input id="fc-txt" placeholder="Ej: La Elisa"></div>
@@ -462,10 +464,11 @@
       </details>
 
       <div class="totales" id="totales-emp"></div>
-      <div class="fila2" style="margin-bottom:14px">
+      <div class="fila2" style="margin-bottom:8px">
         <button class="btn linea" id="btn-imprimir" onclick="imprimirResumen()">🖨️ Imprimir PDF</button>
         <button class="btn" onclick="compartirResumen()">📤 Compartir PDF</button>
       </div>
+      <button class="btn sec" style="margin-bottom:14px" onclick="abrirModalAjuste()">⚖️ Cargar ajuste (bonificación / descuento)</button>
       <div id="lista-cuenta"></div>
     </section>
 
@@ -918,12 +921,34 @@
   </div>
 </div>
 
+<!-- ===== MODAL AJUSTE ===== -->
+<div class="modal-bg" id="modal-ajuste">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-ajuste-titulo">Nuevo ajuste</h3><button class="modal-cerrar" onclick="cerrar('modal-ajuste')">×</button></div>
+    <p class="sub" style="margin-top:0">Suma o resta un importe a lo que le corresponde al trabajador (bonificación, premio, descuento, ajuste de cuenta).</p>
+    <input type="hidden" id="aj-id">
+    <div class="fila2">
+      <div class="campo-form"><label>Fecha</label><input type="date" id="aj-fecha"></div>
+      <div class="campo-form"><label>Trabajador</label><select id="aj-emp" onchange="infoAjuste()"></select></div>
+    </div>
+    <div class="tarjeta" id="aj-info" style="padding:10px 14px;background:#f7f6ef"></div>
+    <div class="fila2">
+      <div class="campo-form"><label>Tipo</label><select id="aj-signo" onchange="infoAjuste()"><option value="1">Suma (a favor del trabajador)</option><option value="-1">Resta (descuento)</option></select></div>
+      <div class="campo-form"><label>Importe ($)</label><input type="number" id="aj-monto" step="0.01" placeholder="0" oninput="infoAjuste()"></div>
+    </div>
+    <div class="campo-form autobox"><label>Concepto</label><input id="aj-concepto" autocomplete="off" placeholder="Ej: Bonificación, Premio, Descuento…" oninput="autocompletar(this,'conceptosAjuste')" onfocus="autocompletar(this,'conceptosAjuste')"><div class="sugerencias"></div></div>
+    <div class="campo-form"><label>Observaciones</label><textarea id="aj-obs" placeholder="Opcional"></textarea></div>
+    <button class="btn" onclick="guardarAjuste()">Guardar ajuste</button>
+    <button class="btn-cancelar" onclick="cerrar('modal-ajuste')">Cancelar</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 /* =================== ESTADO =================== */
 let db=null, firebaseOK=false;
-let empleados={}, pagos={}, labores={}, ganaderos={};
+let empleados={}, pagos={}, labores={}, ganaderos={}, ajustes={};
 let lotes={}, preciosLab={}, gasoil={}, cobros={}, tiposLabor={};
 let cargadoLt={lotes:false,precios:false,tipos:false,labores:false,cobros:false}, migracionLtHecha=false;
 let ltPlanilla='__todas__', ltSub='registros', ltMostrar=120;
@@ -997,6 +1022,7 @@ function escucharDatos(){
   db.ref('pagos').on('value',s=>{pagos=s.val()||{};render();mostrar();});
   db.ref('labores').on('value',s=>{labores=s.val()||{};cargadoLt.labores=true;render();mostrar();chequearMigracionLt();});
   db.ref('ganaderos').on('value',s=>{ganaderos=s.val()||{};render();mostrar();});
+  db.ref('ajustes').on('value',s=>{ajustes=s.val()||{};render();});
   db.ref('lotes').on('value',s=>{lotes=s.val()||{};cargadoLt.lotes=true;render();chequearMigracionLt();});
   db.ref('preciosLab').on('value',s=>{preciosLab=s.val()||{};cargadoLt.precios=true;render();chequearMigracionLt();});
   db.ref('tiposLabor').on('value',s=>{tiposLabor=s.val()||{};cargadoLt.tipos=true;render();chequearMigracionLt();chequearRestauracion();});
@@ -1367,6 +1393,7 @@ function valoresUsados(tipo){
   if(tipo==='maqs')Object.values(lotes).forEach(l=>l.maq&&set.add(l.maq));
   if(tipo==='marcasGasoil')Object.values(gasoil).forEach(g=>g.marca&&set.add(g.marca));
   if(tipo==='cultivos'){CULTIVOS_BASE.forEach(c=>set.add(c));Object.values(preciosLab).forEach(p=>p.cultivo&&set.add(p.cultivo));Object.values(lotes).forEach(l=>l.cultivo&&set.add(l.cultivo));Object.values(labores).forEach(l=>l.cultivo&&set.add(l.cultivo));}
+  if(tipo==='conceptosAjuste'){CONCEPTOS_AJUSTE.forEach(c=>set.add(c));Object.values(ajustes).forEach(a=>a.concepto&&set.add(a.concepto));}
   if(tipo==='itemsgan'){
     ITEMS_GAN_BASE.forEach(a=>set.add(a));
     Object.values(ganaderos).forEach(g=>(g.items||[]).forEach(i=>i.desc&&set.add(i.desc)));
@@ -1515,6 +1542,15 @@ function renderDashboard(){
     if(femp) facturacion+=t;   // al mirar un solo empleado, "le corresponde" incluye lo ganadero
     porEmp[g.emp]=porEmp[g.emp]||{gana:0,paga:0};
     porEmp[g.emp].gana+=t;
+  });
+  // ajustes (bonificaciones / descuentos)
+  Object.values(ajustes).forEach(a=>{
+    if(!pasaFecha(a.fecha))return;
+    if(femp && a.emp!==femp)return;
+    const t=(a.monto||0)*(a.signo===-1?-1:1);
+    correspondeEmp+=t; if(femp) facturacion+=t;
+    porEmp[a.emp]=porEmp[a.emp]||{gana:0,paga:0};
+    porEmp[a.emp].gana+=t;
   });
   const margenEmpresa=facturacion-correspondeEmp;   // lo que le queda a la empresa
   const saldoEmpleados=correspondeEmp-totalPagado;  // lo que realmente se les debe
@@ -1795,6 +1831,60 @@ function terminarRestauracion(){
   if(g.ltSub){const b=document.querySelector(`.subpills button[data-sub="${g.ltSub}"]`);if(b)irSub(g.ltSub,b);}
   render();
 }
+
+
+/* =================== AJUSTES (bonificación / descuento) =================== */
+const CONCEPTOS_AJUSTE=['Bonificación','Premio','Descuento','Ajuste de cuenta','Condonación','Aguinaldo','Vacaciones'];
+function saldoTrabajador(id){ // le corresponde (labores + ganadero + ajustes) − pagado, sin filtros
+  let gana=0, paga=0;
+  Object.values(labores).forEach(l=>(l.participantes||[]).forEach(p=>{if(p.emp===id)gana+=(p.importe||0);}));
+  Object.values(ganaderos).forEach(g=>{if(g.emp===id)gana+=(g.total||0);});
+  Object.values(ajustes).forEach(a=>{if(a.emp===id)gana+=(a.monto||0)*(a.signo===-1?-1:1);});
+  Object.values(pagos).forEach(p=>{if(p.emp===id)paga+=(p.monto||0);});
+  return {gana,paga,saldo:gana-paga};
+}
+function abrirModalAjuste(id){
+  $('aj-id').value=id||'';
+  const sel=$('aj-emp');
+  const arr=Object.entries(empleados).sort((a,b)=>(a[1].orden||0)-(b[1].orden||0));
+  sel.innerHTML=arr.map(([k,e])=>`<option value="${k}">${e.nombre}${e.estado==='inactivo'?' ⊘':''}</option>`).join('');
+  const a=id?ajustes[id]:null;
+  $('modal-ajuste-titulo').textContent=a?'Editar ajuste':'Nuevo ajuste';
+  $('aj-fecha').value=a?a.fecha:hoy();
+  sel.value=a?a.emp:(empSeleccionado!=='__todos__'?empSeleccionado:(arr[0]?arr[0][0]:''));
+  $('aj-signo').value=a?String(a.signo===-1?-1:1):'1';
+  $('aj-monto').value=a?a.monto:''; $('aj-concepto').value=a?a.concepto||'':''; $('aj-obs').value=a?a.obs||'':'';
+  infoAjuste(); abrir('modal-ajuste');
+}
+function infoAjuste(){
+  const id=$('aj-emp').value; const box=$('aj-info'); if(!id){box.innerHTML='';return;}
+  const s=saldoTrabajador(id);
+  const ajId=$('aj-id').value; let sinEste=s.saldo;
+  if(ajId&&ajustes[ajId]&&ajustes[ajId].emp===id) sinEste-= (ajustes[ajId].monto||0)*(ajustes[ajId].signo===-1?-1:1);
+  const monto=parseFloat($('aj-monto').value)||0, signo=parseInt($('aj-signo').value);
+  const nuevo=sinEste+monto*signo;
+  const e=empleados[id];
+  box.innerHTML=`<div style="font-size:13.5px"><b>${e?e.nombre:''}</b> · Le corresponde ${plata(s.gana)} · Pagado ${plata(s.paga)} · Saldo actual <b class="${s.saldo<0?'dif-mal':''}">${plata(s.saldo)}</b>
+    ${monto?`<br>Con este ajuste el saldo quedaría en <b>${plata(nuevo)}</b>`:''}
+    ${Math.abs(sinEste)>0.005?`<br><a href="#" onclick="dejarEnCero();return false;" style="color:var(--campo);font-weight:700">⚖️ Dejar la cuenta en $0</a> <span class="sub" style="font-size:12px">(${sinEste<0?'suma':'resta'} ${plata(Math.abs(sinEste))})</span>`:''}</div>`;
+}
+function dejarEnCero(){
+  const id=$('aj-emp').value; const s=saldoTrabajador(id);
+  const ajId=$('aj-id').value; let sinEste=s.saldo;
+  if(ajId&&ajustes[ajId]&&ajustes[ajId].emp===id) sinEste-= (ajustes[ajId].monto||0)*(ajustes[ajId].signo===-1?-1:1);
+  $('aj-signo').value=sinEste<0?'1':'-1';
+  $('aj-monto').value=Math.abs(sinEste).toFixed(2).replace(/\.00$/,'');
+  if(!$('aj-concepto').value)$('aj-concepto').value=sinEste<0?'Bonificación':'Ajuste de cuenta';
+  infoAjuste();
+}
+function guardarAjuste(){
+  const fecha=$('aj-fecha').value, emp=$('aj-emp').value, monto=parseFloat($('aj-monto').value)||0;
+  if(!fecha){toast('Poné la fecha');return;} if(!emp){toast('Elegí el trabajador');return;} if(!monto){toast('Poné el importe');return;}
+  const concepto=capitalizar($('aj-concepto').value)||'Ajuste';
+  guardar('ajustes/'+($('aj-id').value||uid()),{fecha,emp,signo:parseInt($('aj-signo').value),monto,concepto,obs:$('aj-obs').value.trim()},'Ajuste guardado');
+  cerrar('modal-ajuste');
+}
+function borrarAjuste(id){if(confirm('¿Eliminar este ajuste?'))borrarRegistro('ajustes/'+id,'Ajuste eliminado');}
 
 /* =================== LOTES Y LABORES =================== */
 const LABORES_BASE=[
@@ -2602,21 +2692,28 @@ function armarHTMLResumen(){
       gana+=(g.total||0);
     }
   });
+  Object.values(ajustes).forEach(a=>{
+    if(filtroEmp==='__todos__'||a.emp===filtroEmp){
+      const s=a.signo===-1?-1:1;
+      regs.push({tipo:'ajuste',fecha:a.fecha,emp:a.emp,titulo:a.concepto||'Ajuste',detalle:a.obs||'',monto:(a.monto||0)*s});
+      gana+=(a.monto||0)*s;
+    }
+  });
   regs.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   const saldo=gana-paga;
   const titulo = filtroEmp==='__todos__' ? 'Todos los trabajadores' : (empleados[filtroEmp]?empleados[filtroEmp].nombre:'—');
 
   const filas=regs.map(r=>{
     const e=empleados[r.emp];
-    const esGan=r.tipo==='gan';
-    const entra=r.tipo==='labor'||esGan;
-    const tipoTxt=esGan?'Ganadero':(entra?'Labor':'Pago');
+    const esGan=r.tipo==='gan', esAj=r.tipo==='ajuste';
+    const entra=esAj?(r.monto>=0):(r.tipo==='labor'||esGan);
+    const tipoTxt=esAj?'Ajuste':(esGan?'Ganadero':(entra?'Labor':'Pago'));
     const fechaTxt=esGan?nombreMes((r.fecha||'').slice(0,7)):fechaLinda(r.fecha);
     return `<tr>
       <td>${fechaTxt}</td>
       <td>${tipoTxt}</td>
       <td>${r.titulo}${filtroEmp==='__todos__'?' — '+(e?e.nombre:'—'):''}${r.detalle?'<br><span class="det">'+r.detalle+'</span>':''}</td>
-      <td class="der ${entra?'verde':'rojo'}">${entra?'+':'−'}${plata(r.monto)}</td>
+      <td class="der ${entra?'verde':'rojo'}">${entra?'+':'−'}${plata(Math.abs(r.monto))}</td>
     </tr>`;
   }).join('');
 
@@ -2917,7 +3014,19 @@ function renderCuenta(){
       }
     });
   }
-  if(ftipo!=='labor'){
+  if(ftipo===''||ftipo==='ajuste'){
+    Object.entries(ajustes).forEach(([id,a])=>{
+      if(fact)return;
+      if(!entreFechas(a.fecha,fd,fh))return;
+      if(ftxt && !((a.concepto||'')+' '+(a.obs||'')).toLowerCase().includes(ftxt))return;
+      if(filtroEmp==='__todos__'||a.emp===filtroEmp){
+        const s=a.signo===-1?-1:1;
+        regs.push({tipo:'ajuste',fecha:a.fecha,emp:a.emp,titulo:a.concepto||'Ajuste',meta:a.obs?'📝 '+a.obs:'',monto:(a.monto||0)*s,id});
+        gana+=(a.monto||0)*s;
+      }
+    });
+  }
+  if(ftipo!=='labor'&&ftipo!=='ajuste'){
     Object.entries(pagos).forEach(([id,p])=>{
       if(!entreFechas(p.fecha,fd,fh))return;
       // si hay filtro de campo/actividad, los pagos no aplican salvo que no haya filtro
@@ -2941,10 +3050,10 @@ function renderCuenta(){
   if(!regs.length){cont.innerHTML=vacio('📋','Sin movimientos para esta vista');return;}
   cont.innerHTML=regs.map(r=>{
     const e=empleados[r.emp];
-    const esGan=r.tipo==='gan';
-    const entra=r.tipo==='labor'||esGan;
-    const clase=esGan?'et-gan':(entra?'et-labor':'et-pago');
-    const etiq=esGan?'Ganadero':(entra?'Ganó':'Pago');
+    const esGan=r.tipo==='gan', esAj=r.tipo==='ajuste';
+    const entra=esAj?(r.monto>=0):(r.tipo==='labor'||esGan);
+    const clase=esAj?'et-ajuste':(esGan?'et-gan':(entra?'et-labor':'et-pago'));
+    const etiq=esAj?'Ajuste':(esGan?'Ganadero':(entra?'Ganó':'Pago'));
     const fechaTxt=esGan?nombreMes((r.fecha||'').slice(0,7)):fechaLinda(r.fecha);
     return `<div class="registro ${r.tipo}">
       <div class="reg-info">
@@ -2953,8 +3062,9 @@ function renderCuenta(){
           <span class="reg-titulo">${r.titulo}</span>
         </div>
         <div class="reg-meta">📅 ${fechaTxt}${filtroEmp==='__todos__'?' · 👤 '+(e?e.nombre:'—'):''}${r.meta?' · '+r.meta:''}</div>
+        ${esAj?`<div class="reg-acc"><button class="icono-btn" onclick="abrirModalAjuste('${r.id}')">✏️</button><button class="icono-btn" onclick="borrarAjuste('${r.id}')">🗑️</button></div>`:''}
       </div>
-      <div class="reg-monto ${entra?'entra':'sale'}">${entra?'+':'−'}${plata(r.monto)}</div>
+      <div class="reg-monto ${entra?'entra':'sale'}">${entra?'+':'−'}${plata(Math.abs(r.monto))}</div>
     </div>`;
   }).join('');
 }
@@ -2969,7 +3079,7 @@ function exportarBackup(){
     _app:'Empleados - El Mestizo',
     _version:1,
     _fecha:new Date().toISOString(),
-    empleados, pagos, labores, ganaderos, lotes, preciosLab, gasoil, cobros, tiposLabor
+    empleados, pagos, labores, ganaderos, ajustes, lotes, preciosLab, gasoil, cobros, tiposLabor
   };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -2989,7 +3099,7 @@ function importarBackup(input){
   reader.onload=e=>{
     try{
       const data=JSON.parse(e.target.result);
-      if(!data.empleados&&!data.pagos&&!data.labores&&!data.ganaderos&&!data.lotes&&!data.preciosLab&&!data.gasoil&&!data.cobros){toast('El archivo no parece un backup válido');return;}
+      if(!data.empleados&&!data.pagos&&!data.labores&&!data.ganaderos&&!data.ajustes&&!data.lotes&&!data.preciosLab&&!data.gasoil&&!data.cobros){toast('El archivo no parece un backup válido');return;}
       backupPendiente=data;
       const ne=Object.keys(data.empleados||{}).length;
       const np=Object.keys(data.pagos||{}).length;
@@ -3013,14 +3123,14 @@ function confirmarRestaurar(modo){
   const b=backupPendiente;
   if(modo==='reemplazar'){
     // reemplaza SOLO las colecciones presentes en el archivo (no borra las que no trae)
-    const cols=['empleados','pagos','labores','ganaderos','lotes','preciosLab','gasoil','cobros','tiposLabor'].filter(c=>b[c]);
+    const cols=['empleados','pagos','labores','ganaderos','ajustes','lotes','preciosLab','gasoil','cobros','tiposLabor'].filter(c=>b[c]);
     Promise.all(cols.map(c=>db.ref(c).set(b[c]||{})))
       .then(()=>toast('Datos reemplazados desde el backup'))
       .catch(()=>toast('Error al restaurar'));
   }else{ // combinar: solo IDs que no existen, sin pisar lo actual
     const updates={};
     let agregados=0;
-    [['empleados',empleados],['pagos',pagos],['labores',labores],['ganaderos',ganaderos],['lotes',lotes],['preciosLab',preciosLab],['gasoil',gasoil],['cobros',cobros],['tiposLabor',tiposLabor]].forEach(([col,dest])=>{
+    [['empleados',empleados],['pagos',pagos],['labores',labores],['ganaderos',ganaderos],['ajustes',ajustes],['lotes',lotes],['preciosLab',preciosLab],['gasoil',gasoil],['cobros',cobros],['tiposLabor',tiposLabor]].forEach(([col,dest])=>{
       Object.entries(b[col]||{}).forEach(([id,val])=>{
         if(!(id in dest)){updates[col+'/'+id]=val;agregados++;}
       });

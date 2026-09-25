@@ -1912,6 +1912,7 @@ function borrarAjuste(id){if(confirm('¿Eliminar este ajuste?'))borrarRegistro('
 
 /* =================== CAMPOS PROPIOS (valorización) =================== */
 function clavePP(estab,labor,cultivo){return (estab+'|'+labor+'|'+(cultivo||'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'_');}
+function fechasPP(r){return r.det.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(x=>`${fechaLinda(x.fecha)}${x.lote?' · L.'+x.lote:''}${r.det.length>1?' · '+num2(x.cant)+' '+r.u:''}`).join(' &nbsp;|&nbsp; ');}
 function pctPropio(){const c=propioPrecios._config;const v=c&&c.pct!=null?parseFloat(c.pct):30;return isNaN(v)?30:v;}
 function guardarPctPropio(){
   const v=parseFloat($('pp-pct').value); if(isNaN(v)){toast('Poné un porcentaje válido');return;}
@@ -1931,8 +1932,8 @@ function gruposPropio(){
   Object.values(lotes).forEach(l=>{
     if(l.planilla!=='PROPIO')return; if((l.estado||'S/F')!=='S/F')return; if(es&&l.estab!==es)return; if(!entreFechas(l.fecha,d,h))return;
     const e=l.estab||'—', k=clavePP(e,l.labor,l.cultivo);
-    g[e]=g[e]||{}; g[e][k]=g[e][k]||{labor:l.labor,cultivo:l.cultivo||'',cant:0,n:0,u:unidadLabor(l.labor)};
-    g[e][k].cant+=(l.cant||0); g[e][k].n++;
+    g[e]=g[e]||{}; g[e][k]=g[e][k]||{labor:l.labor,cultivo:l.cultivo||'',cant:0,n:0,u:unidadLabor(l.labor),det:[]};
+    g[e][k].cant+=(l.cant||0); g[e][k].n++; g[e][k].det.push({fecha:l.fecha,lote:l.lote,cant:l.cant||0});
   });
   return {g,es,d,h};
 }
@@ -1957,7 +1958,7 @@ function renderPropio(){
       const pr=precioFilaPP(k,r.labor,r.cultivo,e,h); const bruto=r.cant*pr.precio, gasto=bruto*pct/100; sub+=gasto;
       const cands=candidatosPrecio(r.labor,r.cultivo,e,h).slice(0,8);
       return `<tr>
-        <td><b>${r.labor}</b>${r.cultivo?` <span class="chico" style="display:inline;color:var(--campo);font-weight:700">🌱 ${r.cultivo}</span>`:''}<span class="chico">${r.n} registro(s)</span></td>
+        <td><b>${r.labor}</b>${r.cultivo?` <span class="chico" style="display:inline;color:var(--campo);font-weight:700">🌱 ${r.cultivo}</span>`:''}<span class="chico">📅 ${fechasPP(r)}</span></td>
         <td class="n">${num2(r.cant)} ${r.u}</td>
         <td>
           <input type="number" step="0.01" class="fa-inp" style="width:120px" value="${pr.precio||''}" placeholder="0" onchange="setPrecioPP('${k}','${e.replace(/'/g,"\\'")}','${r.labor.replace(/'/g,"\\'")}','${(r.cultivo||'').replace(/'/g,"\\'")}',this.value)">
@@ -1993,7 +1994,7 @@ function armarHTMLPropio(){
   campos.forEach(e=>{let sub=0;
     const filas=Object.entries(g[e]).sort((a,b)=>a[1].labor.localeCompare(b[1].labor)).map(([k,r])=>{
       const pr=precioFilaPP(k,r.labor,r.cultivo,e,h); const bruto=r.cant*pr.precio, gasto=bruto*pct/100; sub+=gasto;
-      return `<tr><td>${r.labor}${r.cultivo?' <span class="det">· '+r.cultivo+'</span>':''}</td><td class="der">${num2(r.cant)} ${r.u}</td><td class="der">${plata(pr.precio)}</td><td class="der">${plata(bruto)}</td><td class="der">${plata(gasto)}</td></tr>`;}).join('');
+      return `<tr><td>${r.labor}${r.cultivo?' <span class="det">· '+r.cultivo+'</span>':''}<br><span class="det">${fechasPP(r)}</span></td><td class="der">${num2(r.cant)} ${r.u}</td><td class="der">${plata(pr.precio)}</td><td class="der">${plata(bruto)}</td><td class="der">${plata(gasto)}</td></tr>`;}).join('');
     total+=sub;
     cuerpo+=`<h2>${e}</h2><table><thead><tr><th>Labor</th><th class="der">Cantidad</th><th class="der">Precio unit.</th><th class="der">Valor 100%</th><th class="der">Gasto ${pct}%</th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td colspan="4">Subtotal ${e}</td><td class="der">${plata(sub)}</td></tr></tfoot></table>`;});
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Valorización campos propios</title>

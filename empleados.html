@@ -526,6 +526,24 @@
       <div id="lt-precios" style="display:none">
         <p class="sub">Cargá el precio de cada labor cuando facturás. La calculadora toma el último precio de cada labor como base.</p>
         <button class="btn" onclick="abrirModalPrecio()">+ Cargar precio de labor</button>
+        <details class="filtros" style="margin-top:12px">
+          <summary>🔍 Filtros</summary>
+          <div class="fila2">
+            <div class="campo-form"><label>Desde</label><input type="date" id="fpr-desde"></div>
+            <div class="campo-form"><label>Hasta</label><input type="date" id="fpr-hasta"></div>
+          </div>
+          <div class="fila2">
+            <div class="campo-form"><label>Labor</label><select id="fpr-labor"><option value="">Todas</option></select></div>
+            <div class="campo-form"><label>Cultivo</label><select id="fpr-cultivo"><option value="">Todos</option></select></div>
+          </div>
+          <div class="campo-form"><label>Establecimiento</label><select id="fpr-estab"><option value="">Todos</option></select></div>
+          <div class="campo-form"><label>Buscar (observaciones / importe)</label><input id="fpr-txt" placeholder="Ej: trigo"></div>
+          <div class="fila2">
+            <button class="btn peq linea" onclick="render()">Aplicar</button>
+            <button class="btn peq gris" onclick="limpiarFiltros('precios')">Limpiar</button>
+          </div>
+        </details>
+        <div id="lista-precios-tot"></div>
         <div style="height:12px"></div>
         <div id="lista-precios"></div>
       </div>
@@ -534,6 +552,22 @@
       <div id="lt-gasoil" style="display:none">
         <p class="sub">Cargá cada compra de gasoil con su precio por litro. Sirve para actualizar precios según el costo del combustible.</p>
         <button class="btn" onclick="abrirModalGasoil()">+ Cargar compra de gasoil</button>
+        <details class="filtros" style="margin-top:12px">
+          <summary>🔍 Filtros</summary>
+          <div class="fila2">
+            <div class="campo-form"><label>Desde</label><input type="date" id="fga-desde"></div>
+            <div class="campo-form"><label>Hasta</label><input type="date" id="fga-hasta"></div>
+          </div>
+          <div class="fila2">
+            <div class="campo-form"><label>Marca / proveedor</label><select id="fga-marca"><option value="">Todas</option></select></div>
+            <div class="campo-form"><label>Buscar (observaciones / precio)</label><input id="fga-txt" placeholder="Ej: factura"></div>
+          </div>
+          <div class="fila2">
+            <button class="btn peq linea" onclick="render()">Aplicar</button>
+            <button class="btn peq gris" onclick="limpiarFiltros('gasoil')">Limpiar</button>
+          </div>
+        </details>
+        <div id="lista-gasoil-tot"></div>
         <div style="height:12px"></div>
         <div id="lista-gasoil"></div>
       </div>
@@ -1483,6 +1517,8 @@ function limpiarFiltros(t){
   else if(t==='pago'){['fp-desde','fp-hasta','fp-txt'].forEach(i=>$(i).value='');$('fp-cat').value='';$('fp-emp').value='';}
   else if(t==='cuenta'){['fc-desde','fc-hasta','fc-txt'].forEach(i=>$(i).value='');$('fc-tipo').value='';$('fc-act').value='';}
   else if(t==='lotes'){['lf-desde','lf-hasta','lf-txt'].forEach(i=>$(i).value='');['lf-estab','lf-labor','lf-estado','lf-maq','lf-cultivo'].forEach(i=>$(i).value='');ltMostrar=120;}
+  else if(t==='precios'){['fpr-desde','fpr-hasta','fpr-txt','fpr-labor','fpr-cultivo','fpr-estab'].forEach(i=>{if($(i))$(i).value='';});}
+  else if(t==='gasoil'){['fga-desde','fga-hasta','fga-txt','fga-marca'].forEach(i=>{if($(i))$(i).value='';});}
   else if(t==='dash'){['fd-desde','fd-hasta'].forEach(i=>$(i).value='');$('fd-mes').value='';$('fd-emp').value='';}
   render();
 }
@@ -1493,6 +1529,7 @@ function render(){
   if($('app').style.display==='none')return;
   llenarFiltros();
   llenarFiltrosLotes();
+  llenarFiltrosPreciosGasoil();
   aplicarFiltrosGuardados();
   renderDashboard();
   renderLabores();
@@ -1823,7 +1860,8 @@ function seleccionarEmp(id){empSeleccionado=id;renderPestanas();renderCuenta();}
 /* =================== FILTROS PERSISTENTES (se conservan al cerrar y abrir) =================== */
 const IDS_FILTROS=['fl-desde','fl-hasta','fl-act','fl-emp','fl-txt','fp-desde','fp-hasta','fp-cat','fp-emp','fp-txt',
   'fc-desde','fc-hasta','fc-tipo','fc-act','fc-txt','fd-mes','fd-desde','fd-hasta','fd-emp',
-  'lf-desde','lf-hasta','lf-estab','lf-labor','lf-estado','lf-maq','lf-cultivo','lf-txt','pp-estab','pp-desde','pp-hasta'];
+  'lf-desde','lf-hasta','lf-estab','lf-labor','lf-estado','lf-maq','lf-cultivo','lf-txt','pp-estab','pp-desde','pp-hasta',
+  'fpr-desde','fpr-hasta','fpr-labor','fpr-cultivo','fpr-estab','fpr-txt','fga-desde','fga-hasta','fga-marca','fga-txt'];
 let filtrosGuardados=null, filtrosRestaurados=false;
 try{filtrosGuardados=JSON.parse(localStorage.getItem('mestizo_filtros')||'null');}catch(e){filtrosGuardados=null;}
 function guardarFiltros(){
@@ -2397,10 +2435,38 @@ function borrarTipo(id){
 }
 
 /* ---- precios de labores ---- */
+function llenarSelectConservando(sel,valores,todos){
+  if(!sel)return;
+  const act=sel.value;
+  sel.innerHTML=`<option value="">${todos}</option>`+valores.map(v=>`<option value="${v}">${v}</option>`).join('');
+  if(valores.includes(act))sel.value=act;
+}
+function llenarFiltrosPreciosGasoil(){
+  const pr=Object.values(preciosLab||{}), ga=Object.values(gasoil||{});
+  llenarSelectConservando($('fpr-labor'),[...new Set(pr.map(x=>x.labor).filter(Boolean))].sort(),'Todas');
+  llenarSelectConservando($('fpr-cultivo'),[...new Set(pr.map(x=>x.cultivo).filter(Boolean))].sort(),'Todos');
+  llenarSelectConservando($('fpr-estab'),[...new Set(pr.map(x=>x.estab).filter(Boolean))].sort(),'Todos');
+  llenarSelectConservando($('fga-marca'),[...new Set(ga.map(x=>x.marca).filter(Boolean))].sort(),'Todas');
+}
 function renderPrecios(){
   const cont=$('lista-precios'); if(!cont)return;
-  const arr=Object.entries(preciosLab).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
-  if(!arr.length){cont.innerHTML=vacio('💲','Todavía no cargaste precios');return;}
+  const todos=Object.entries(preciosLab).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+  const tot=$('lista-precios-tot');
+  if(!todos.length){cont.innerHTML=vacio('💲','Todavía no cargaste precios');if(tot)tot.innerHTML='';return;}
+  const fd=$('fpr-desde')?.value||'',fh=$('fpr-hasta')?.value||'',fl=$('fpr-labor')?.value||'',fc=$('fpr-cultivo')?.value||'',fe=$('fpr-estab')?.value||'',ft=($('fpr-txt')?.value||'').trim().toLowerCase();
+  const arr=todos.filter(([id,p])=>{
+    if(!entreFechas(p.fecha||'',fd,fh))return false;
+    if(fl&&p.labor!==fl)return false;
+    if(fc&&(p.cultivo||'')!==fc)return false;
+    if(fe&&(p.estab||'')!==fe)return false;
+    if(ft&&!((p.obs||'')+' '+(p.labor||'')+' '+(p.cultivo||'')+' '+(p.estab||'')+' '+String(p.importe||'')).toLowerCase().includes(ft))return false;
+    return true;
+  });
+  if(tot){
+    const hayFiltro=fd||fh||fl||fc||fe||ft;
+    tot.innerHTML=hayFiltro||arr.length!==todos.length?`<div class="sub" style="margin-top:10px;font-size:13px">Mostrando <b>${arr.length}</b> de ${todos.length} precios${arr.length?` · desde ${fechaLinda(arr[arr.length-1][1].fecha)} hasta ${fechaLinda(arr[0][1].fecha)}`:''}</div>`:'';
+  }
+  if(!arr.length){cont.innerHTML=vacio('🔍','Ningún precio coincide con los filtros');return;}
   cont.innerHTML=arr.map(([id,p])=>`<div class="registro precio">
       <div class="reg-info">
         <div class="reg-top"><span class="etiqueta et-fact">Precio</span><span class="reg-titulo">${p.labor}</span>${p.cultivo?`<span class="etiqueta et-labor">🌱 ${p.cultivo}</span>`:''}</div>
@@ -2444,8 +2510,29 @@ function borrarPrecio(id){if(confirm('¿Eliminar este precio?'))borrarRegistro('
 /* ---- gasoil ---- */
 function renderGasoil(){
   const cont=$('lista-gasoil'); if(!cont)return;
-  const arr=Object.entries(gasoil).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
-  if(!arr.length){cont.innerHTML=vacio('⛽','Todavía no cargaste compras de gasoil');return;}
+  const todos=Object.entries(gasoil).sort((a,b)=>(b[1].fecha||'').localeCompare(a[1].fecha||''));
+  const tot=$('lista-gasoil-tot');
+  if(!todos.length){cont.innerHTML=vacio('⛽','Todavía no cargaste compras de gasoil');if(tot)tot.innerHTML='';return;}
+  const fd=$('fga-desde')?.value||'',fh=$('fga-hasta')?.value||'',fm=$('fga-marca')?.value||'',ft=($('fga-txt')?.value||'').trim().toLowerCase();
+  const arr=todos.filter(([id,g])=>{
+    if(!entreFechas(g.fecha||'',fd,fh))return false;
+    if(fm&&(g.marca||'')!==fm)return false;
+    if(ft&&!((g.obs||'')+' '+(g.marca||'')+' '+String(g.precio||'')).toLowerCase().includes(ft))return false;
+    return true;
+  });
+  if(tot){
+    const litros=arr.reduce((a,[,g])=>a+(g.litros||0),0);
+    const gasto=arr.reduce((a,[,g])=>a+(g.litros?g.precio*g.litros:0),0);
+    const prom=arr.length?arr.reduce((a,[,g])=>a+g.precio,0)/arr.length:0;
+    tot.innerHTML=arr.length?`<div class="tarjeta" style="padding:12px 14px;margin-top:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;margin-bottom:6px">Totales de lo filtrado · ${arr.length} de ${todos.length} compras</div>
+      <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>Litros</span><b>${litros?num2(litros)+' L':'—'}</b></div>
+      <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>Gasto total</span><b>${gasto?plata(gasto):'—'}</b></div>
+      <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>Precio promedio por litro</span><b>${plata(prom)}</b></div>
+      ${litros&&gasto?`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13.5px"><span>Precio ponderado por litro</span><b>${plata(gasto/litros)}</b></div>`:''}
+    </div>`:'';
+  }
+  if(!arr.length){cont.innerHTML=vacio('🔍','Ninguna compra coincide con los filtros');return;}
   cont.innerHTML=arr.map(([id,g],i)=>{
     const ant=arr[i+1]?arr[i+1][1].precio:null;
     const var_=ant?((g.precio/ant-1)*100):null;

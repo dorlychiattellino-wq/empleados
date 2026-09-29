@@ -231,6 +231,10 @@
   .tabla-calc td.n{text-align:right;white-space:nowrap;font-weight:700}
   .tabla-calc td.prom{background:#f0f6ee;color:var(--campo-osc);font-size:15px}
   .tabla-calc .chico{display:block;font-size:11px;color:var(--gris);font-weight:400}
+  .pp-reg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--gris);font-weight:400;margin-top:3px;cursor:pointer}
+  .pp-reg input{width:16px;height:16px;margin:0;accent-color:var(--campo);cursor:pointer}
+  .pp-reg.fact{color:var(--verde-ok)}
+  .pp-reg .tag-f{font-size:10px;font-weight:700;background:#e3f1e2;color:#2f6b35;border-radius:6px;padding:1px 6px}
   .nota-calc{font-size:12.5px;color:var(--gris);background:#fff7e0;border:1px solid var(--trigo);border-radius:10px;padding:9px 12px;margin-top:12px}
   .kpis3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
   @media(max-width:560px){.kpis3{grid-template-columns:1fr 1fr}.tabla-calc{min-width:560px}}
@@ -601,7 +605,7 @@
 
       <!-- CAMPOS PROPIOS -->
       <div id="lt-propio" style="display:none">
-        <p class="sub">Valoriza las labores <b>sin facturar</b> de campos propios (planilla PROPIO): cantidad × precio de la labor × porcentaje. Al marcar un registro como facturado, sale de esta lista.</p>
+        <p class="sub">Valoriza las labores de campos propios (planilla PROPIO): cantidad × precio de la labor × porcentaje. Tildá ☑ cada registro cuando lo facturás: queda como <b>facturado</b> también en Registros → Propio y sale de los pendientes.</p>
         <div class="tarjeta">
           <div class="fila2">
             <div class="campo-form"><label>Campo</label><select id="pp-estab" onchange="renderPropio()"><option value="">Todos los campos propios</option></select></div>
@@ -611,6 +615,7 @@
             <div class="campo-form"><label>Desde (opcional)</label><input type="date" id="pp-desde" onchange="renderPropio()"></div>
             <div class="campo-form"><label>Hasta (opcional)</label><input type="date" id="pp-hasta" onchange="renderPropio()"></div>
           </div>
+          <div class="campo-form"><label>Mostrar</label><select id="pp-estado" onchange="renderPropio();guardarFiltros()"><option value="S/F">Sin facturar (pendientes)</option><option value="FACT">Ya facturados</option><option value="">Todos</option></select></div>
           <div class="fila2">
             <button class="btn" onclick="compartirPropio()">📤 Compartir PDF</button>
             <button class="btn linea" onclick="imprimirPropio()">🖨️ Imprimir</button>
@@ -1865,7 +1870,7 @@ function seleccionarEmp(id){empSeleccionado=id;renderPestanas();renderCuenta();}
 /* =================== FILTROS PERSISTENTES (se conservan al cerrar y abrir) =================== */
 const IDS_FILTROS=['fl-desde','fl-hasta','fl-act','fl-emp','fl-txt','fp-desde','fp-hasta','fp-cat','fp-emp','fp-txt',
   'fc-desde','fc-hasta','fc-tipo','fc-act','fc-txt','fd-mes','fd-desde','fd-hasta','fd-emp',
-  'lf-desde','lf-hasta','lf-estab','lf-labor','lf-estado','lf-maq','lf-cultivo','lf-txt','pp-estab','pp-desde','pp-hasta',
+  'lf-desde','lf-hasta','lf-estab','lf-labor','lf-estado','lf-maq','lf-cultivo','lf-txt','pp-estab','pp-desde','pp-hasta','pp-estado',
   'fpr-desde','fpr-hasta','fpr-labor','fpr-cultivo','fpr-estab','fpr-txt','fga-desde','fga-hasta','fga-marca','fga-txt'];
 let filtrosGuardados=null, filtrosRestaurados=false;
 try{filtrosGuardados=JSON.parse(localStorage.getItem('mestizo_filtros')||'null');}catch(e){filtrosGuardados=null;}
@@ -1971,14 +1976,15 @@ function candidatosPrecio(labor,cultivo,estab,hasta){
 }
 function gruposPropio(){
   const es=$('pp-estab')?$('pp-estab').value:'', d=$('pp-desde')?$('pp-desde').value:'', h=$('pp-hasta')?$('pp-hasta').value:'';
+  const est=$('pp-estado')?$('pp-estado').value:'S/F';
   const g={};
-  Object.values(lotes).forEach(l=>{
-    if(l.planilla!=='PROPIO')return; if((l.estado||'S/F')!=='S/F')return; if(es&&l.estab!==es)return; if(!entreFechas(l.fecha,d,h))return;
+  Object.entries(lotes).forEach(([id,l])=>{
+    if(l.planilla!=='PROPIO')return; if(est&&(l.estado||'S/F')!==est)return; if(es&&l.estab!==es)return; if(!entreFechas(l.fecha,d,h))return;
     const e=l.estab||'—', k=clavePP(e,l.labor,l.cultivo);
     g[e]=g[e]||{}; g[e][k]=g[e][k]||{labor:l.labor,cultivo:l.cultivo||'',cant:0,n:0,u:unidadLabor(l.labor),det:[]};
-    g[e][k].cant+=(l.cant||0); g[e][k].n++; g[e][k].det.push({fecha:l.fecha,lote:l.lote,cant:l.cant||0});
+    g[e][k].cant+=(l.cant||0); g[e][k].n++; g[e][k].det.push({id,fecha:l.fecha,lote:l.lote,cant:l.cant||0,fact:(l.estado||'S/F')==='FACT',nro:l.nroFact||'',ff:l.fechaFact||''});
   });
-  return {g,es,d,h};
+  return {g,es,d,h,est};
 }
 function precioFilaPP(k,labor,cultivo,estab,hasta){
   const m=propioPrecios[k]; if(m&&m.precio!=null)return {precio:parseFloat(m.precio)||0,manual:true};
@@ -1993,7 +1999,8 @@ function renderPropio(){
   if(document.activeElement!==$('pp-pct'))$('pp-pct').value=pctPropio();
   const pct=pctPropio(), {g,h}=gruposPropio();
   const campos=Object.keys(g).sort();
-  if(!campos.length){out.innerHTML=vacio('🏡','No hay registros PROPIO sin facturar con esos filtros');return;}
+  const estSel=$('pp-estado')?$('pp-estado').value:'S/F';
+  if(!campos.length){out.innerHTML=vacio('🏡',estSel==='FACT'?'No hay registros PROPIO facturados con esos filtros':(estSel?'No hay registros PROPIO sin facturar con esos filtros':'No hay registros PROPIO con esos filtros'));return;}
   let total=0, html='';
   campos.forEach(e=>{
     let sub=0;
@@ -2001,7 +2008,7 @@ function renderPropio(){
       const pr=precioFilaPP(k,r.labor,r.cultivo,e,h); const bruto=r.cant*pr.precio, gasto=bruto*pct/100; sub+=gasto;
       const cands=candidatosPrecio(r.labor,r.cultivo,e,h).slice(0,8);
       return `<tr>
-        <td><b>${r.labor}</b>${r.cultivo?` <span class="chico" style="display:inline;color:var(--campo);font-weight:700">🌱 ${r.cultivo}</span>`:''}<span class="chico">📅 ${fechasPP(r)}</span></td>
+        <td><b>${r.labor}</b>${r.cultivo?` <span class="chico" style="display:inline;color:var(--campo);font-weight:700">🌱 ${r.cultivo}</span>`:''}${regsPP(r)}</td>
         <td class="n">${num2(r.cant)} ${r.u}</td>
         <td>
           <input type="number" step="0.01" class="fa-inp" style="width:120px" value="${pr.precio||''}" placeholder="0" onchange="setPrecioPP('${k}','${e.replace(/'/g,"\\'")}','${r.labor.replace(/'/g,"\\'")}','${(r.cultivo||'').replace(/'/g,"\\'")}',this.value)">
@@ -2024,12 +2031,30 @@ function renderPropio(){
     <div class="total-card gana"><div class="et">Venta Servicios agrícolas (${pct}%)</div><div class="num" style="color:var(--verde-ok)">${plata(total)}</div></div></div>`;
   out.innerHTML=html;
 }
+function regsPP(r){
+  const det=r.det.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  const ids=det.map(x=>x.id), todos=det.every(x=>x.fact);
+  const lineas=det.map(x=>`<label class="pp-reg${x.fact?' fact':''}"><input type="checkbox" ${x.fact?'checked':''} onchange="factPropio(['${x.id}'],this.checked)">📅 ${fechaLinda(x.fecha)}${x.lote?' · L.'+x.lote:''} · ${num2(x.cant)} ${r.u}${x.fact?` <span class="tag-f">FACT${x.nro&&x.nro!=='0'?' '+x.nro:''}</span>`:''}</label>`).join('');
+  const grupo=det.length>1?`<label class="pp-reg" style="font-weight:700;color:var(--campo)"><input type="checkbox" ${todos?'checked':''} onchange="factPropio(${JSON.stringify(ids).replace(/"/g,"'")},this.checked)">Tildar todos (${det.length})</label>`:'';
+  return grupo+lineas;
+}
+function factPropio(ids,marcar){
+  if(!ids.length)return;
+  const up={};
+  ids.forEach(id=>{ if(!lotes[id])return;
+    up['lotes/'+id+'/estado']=marcar?'FACT':'S/F';
+    if(marcar){ if(!lotes[id].fechaFact)up['lotes/'+id+'/fechaFact']=hoy(); }
+    else { up['lotes/'+id+'/fechaFact']=''; }
+  });
+  guardarVarios(up, marcar?(ids.length>1?`${ids.length} registros marcados como facturados`:'Registro marcado como facturado'):(ids.length>1?`${ids.length} registros vuelven a sin facturar`:'Registro vuelve a sin facturar'));
+}
 function setPrecioPP(k,estab,labor,cultivo,v){
   const n=parseFloat(v); if(isNaN(n)){return;}
   guardar('propioPrecios/'+k,{estab,labor,cultivo,precio:n},'Precio guardado');
 }
 function armarHTMLPropio(){
-  const pct=pctPropio(), {g,es,d,h}=gruposPropio(); const campos=Object.keys(g).sort();
+  const pct=pctPropio(), {g,es,d,h,est}=gruposPropio(); const campos=Object.keys(g).sort();
+  const subt=est==='FACT'?'(facturadas)':(est?'(pendientes de facturar)':'(facturadas y pendientes)');
   if(!campos.length){toast('No hay registros PROPIO con esos filtros');return null;}
   const f=new Date(); const fechaImp=fechaLinda(hoy())+' '+('0'+f.getHours()).slice(-2)+':'+('0'+f.getMinutes()).slice(-2);
   const periodo=(d||h)?`${d?fechaLinda(d):'inicio'} al ${h?fechaLinda(h):fechaLinda(hoy())}`:'todo el historial';
@@ -2051,7 +2076,7 @@ function armarHTMLPropio(){
   .tot{display:flex;gap:12px;margin-top:14px}.tot div{flex:1;border:1px solid #e4e2d6;border-radius:10px;padding:10px;text-align:center}.tot .et{font-family:Arial,sans-serif;font-size:10.5px;text-transform:uppercase;color:#6b7268}.tot .num{font-size:18px;font-weight:bold;margin-top:3px}
   .nota{font-family:Arial,sans-serif;font-size:11.5px;color:#4a4f46;background:#fff7e0;border-left:3px solid #d9b44a;padding:8px 12px;margin-top:12px}
   .pie{margin-top:20px;font-family:Arial,sans-serif;font-size:10.5px;color:#9a9a8e;text-align:center;border-top:1px solid #e4e2d6;padding-top:8px}@media print{body{padding:16px}}</style></head><body>
-  <div class="cab"><img src="${LOGO_PDF}"><div><h1>${EMPRESA.nombre}</h1><p class="sub">Valorización de labores en campos propios (pendientes de facturar)</p></div></div>
+  <div class="cab"><img src="${LOGO_PDF}"><div><h1>${EMPRESA.nombre}</h1><p class="sub">Valorización de labores en campos propios ${subt}</p></div></div>
   <div class="cli"><span>Campos: <b>${es||'todos los propios'}</b></span><span>Período: <b>${periodo}</b></span><span>Porcentaje: <b>${pct}%</b></span><span>Emitido: <b>${fechaImp}</b></span></div>
   ${cuerpo}
   <div class="tot"><div><div class="et">Gasto total campos propios</div><div class="num">${plata(total)}</div></div><div><div class="et">Venta Servicios agrícolas</div><div class="num" style="color:#3a8a4a">${plata(total)}</div></div></div>

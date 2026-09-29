@@ -810,13 +810,18 @@
       <div class="campo-form autobox"><label>Lote</label><input id="lo-lote" autocomplete="off" placeholder="Ej: 18 SUR" oninput="autocompletar(this,'lotesNom')" onfocus="autocompletar(this,'lotesNom')"><div class="sugerencias"></div></div>
     </div>
     <div class="fila2">
-      <div class="campo-form"><label>Labor</label><select id="lo-labor" onchange="difLote()"></select></div>
+      <div class="campo-form"><label>Labor</label><select id="lo-labor" onchange="difLote();rindeLote('cant')"></select></div>
       <div class="campo-form autobox"><label>Cultivo (opcional)</label><input id="lo-cultivo" autocomplete="off" placeholder="Ej: Soja, Maíz tardío…" oninput="autocompletar(this,'cultivos')" onfocus="autocompletar(this,'cultivos')"><div class="sugerencias"></div></div>
     </div>
     <div class="fila2">
-      <div class="campo-form"><label id="lo-cant-lbl">Cantidad (monitor)</label><input type="number" id="lo-cant" step="0.01" placeholder="0" oninput="difLote()"></div>
+      <div class="campo-form"><label id="lo-cant-lbl">Cantidad (monitor)</label><input type="number" id="lo-cant" step="0.01" placeholder="0" oninput="difLote();rindeLote('cant')"></div>
       <div class="campo-form"><label>A facturar (pool)</label><input type="number" id="lo-fact" step="0.01" placeholder="Igual que monitor si vacío" oninput="difLote()"></div>
     </div>
+    <div class="fila2">
+      <div class="campo-form"><label>Kilos cosechados (opcional)</label><input type="number" id="lo-kg" step="1" placeholder="Ej: 85000" oninput="rindeLote('kg')"></div>
+      <div class="campo-form"><label>Rinde tn/ha (opcional)</label><input type="number" id="lo-rinde" step="0.01" placeholder="Ej: 8,5" oninput="rindeLote('rinde')"></div>
+    </div>
+    <div class="sub" id="lo-rinde-ayuda" style="font-size:12px;margin:-6px 0 10px"></div>
     <div class="tarjeta" id="lo-dif-box" style="padding:10px 14px;background:#f7f6ef"><span class="sub" id="lo-dif-txt">Diferencia monitor − facturar: —</span></div>
     <div class="fila2">
       <div class="campo-form"><label>Estado</label><select id="lo-estado"><option value="S/F">Sin facturar</option><option value="FACT">Facturado</option></select></div>
@@ -2241,7 +2246,7 @@ function renderLotes(){
           <span class="etiqueta ${sf?'et-sf':'et-fact'}">${sf?'S/F':'FACT'}</span>
           <span class="reg-titulo">${l.estab||'—'}${l.lote?' · Lote '+l.lote:''}</span>
         </div>
-        <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🚜 ${l.labor}${l.cultivo?' · 🌱 '+l.cultivo:''}${l.maq?' · 👤 '+l.maq:''}</div>
+        <div class="reg-meta">📅 ${fechaLinda(l.fecha)} · 🚜 ${l.labor}${l.cultivo?' · 🌱 '+l.cultivo:''}${l.maq?' · 👤 '+l.maq:''}${l.kg?` · ⚖️ ${num2(l.kg)} kg`:''}${l.rinde?` · 🌽 Rinde ${num2(l.rinde)} tn/ha`:''}</div>
         <div class="reg-meta">${l.planilla==='BERNARDO'&&fact!=null&&Math.abs(dif)>0.005?`Monitor <b>${num2(l.cant)}</b> · A facturar <b>${num2(fact)}</b> · Dif. <span class="${dif>0?'dif-mal':'dif-ok'}">${num2(dif)}</span>`:''}${l.planilla==='BERNARDO'&&l.dif?` · Ajuste ${num2(l.dif)}`:''}${l.nroFact&&l.nroFact!=='0'?` · 🧾 ${l.nroFact}${l.fechaFact?' ('+fechaLinda(l.fechaFact)+')':''}`:''}</div>
         ${l.obs?`<div class="reg-obs">${l.obs}</div>`:''}
         <div class="reg-acc">
@@ -2271,7 +2276,10 @@ function abrirModalLote(id){
   $('lo-nroFact').value=l?l.nroFact||'':'';
   $('lo-maq').value=l?l.maq||'':'';
   $('lo-obs').value=l?l.obs||'':'';
-  difLote();
+  $('lo-kg').value=l&&l.kg?l.kg:'';
+  $('lo-rinde').value=l&&l.rinde?l.rinde:'';
+  loRindeFuente=l&&l.kg?'kg':(l&&l.rinde?'rinde':'');
+  difLote(); ayudaRinde();
   abrir('modal-lote');
 }
 function difLote(){
@@ -2280,6 +2288,26 @@ function difLote(){
   $('lo-cant-lbl').textContent=`Cantidad (monitor) en ${u}`;
   $('lo-dif-txt').innerHTML=f==null?'Diferencia monitor − facturar: — (se factura lo del monitor)':
     `Diferencia monitor − facturar: <b class="${(c-f)>0?'dif-mal':'dif-ok'}">${num2(c-f)} ${u}</b>`;
+}
+/* kilos cosechados <-> rinde (tn/ha) sobre las ha del monitor */
+let loRindeFuente='';
+function hasLote(){ return unidadLabor($('lo-labor').value)==='ha'?(parseFloat($('lo-cant').value)||0):0; }
+function ayudaRinde(){
+  const has=hasLote();
+  $('lo-rinde-ayuda').textContent=has?`Cargá uno de los dos y el otro se calcula solo sobre ${num2(has)} ha. Podés corregirlo o dejarlos en blanco.`
+    :(unidadLabor($('lo-labor').value)==='ha'?'Poné la cantidad de ha para que se calcule automáticamente. Podés dejarlos en blanco.':'Esta labor se mide en tn: no se calcula automático, cargalos a mano si querés.');
+}
+function rindeLote(orig){
+  const has=hasLote(), kgEl=$('lo-kg'), rEl=$('lo-rinde');
+  if(orig==='kg'||orig==='rinde'){
+    loRindeFuente=(orig==='kg'?kgEl:rEl).value===''?'':orig;
+    if(loRindeFuente===''){ (orig==='kg'?rEl:kgEl).value=''; ayudaRinde(); return; }
+  }
+  if(has>0){
+    if(loRindeFuente==='kg'){const kg=parseFloat(kgEl.value)||0; rEl.value=kg?Math.round(kg/1000/has*100)/100:'';}
+    else if(loRindeFuente==='rinde'){const r=parseFloat(rEl.value)||0; kgEl.value=r?Math.round(r*1000*has):'';}
+  }
+  ayudaRinde();
 }
 function guardarLote(){
   const fecha=$('lo-fecha').value, estab=titulo($('lo-estab').value);
@@ -2291,6 +2319,8 @@ function guardarLote(){
     cant,estado:$('lo-estado').value,fechaFact:$('lo-fechaFact').value,nroFact:$('lo-nroFact').value.trim(),
     maq:$('lo-maq').value.trim().toUpperCase(),obs:$('lo-obs').value.trim()};
   if($('lo-fact').value!=='')obj.fact=parseFloat($('lo-fact').value)||0;
+  if($('lo-kg').value!==''&&parseFloat($('lo-kg').value))obj.kg=parseFloat($('lo-kg').value);
+  if($('lo-rinde').value!==''&&parseFloat($('lo-rinde').value))obj.rinde=parseFloat($('lo-rinde').value);
   if(!obj.cultivo)obj.cultivo=cultivoDesdeObsLote(obj.obs);
   const id=$('lo-id').value||uid();
   fechaSesion.lote=fecha;

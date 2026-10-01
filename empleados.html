@@ -3070,6 +3070,94 @@ function armarHTMLResumen(per){
   return html;
 }
 
+/* PDF de liquidación por período (mismo formato que la ganadera, con conceptos detallados) */
+function armarHTMLPeriodo(per){
+  const emp=empSeleccionado; const e=empleados[emp]; if(!e){toast('Elegí un trabajador');return null;}
+  const nombre=e.nombre; const d=per.desde||'', h=per.hasta||'';
+  const enPer=f=>entreFechas(f||'',d,h), antes=f=>d&&(f||'')<d;
+  let items=[], antGana=0, antPaga=0;
+  Object.values(labores).forEach(l=>(l.participantes||[]).forEach(pp=>{ if(pp.emp!==emp)return;
+    if(enPer(l.fecha))items.push({fecha:l.fecha,orden:l.fecha,concepto:l.act,det:`${fechaLinda(l.fecha)} · ${l.campo||'—'}${l.cultivo?' · '+l.cultivo:''} · ${l.has} ha`,signo:1,monto:pp.importe||0});
+    else if(antes(l.fecha))antGana+=pp.importe||0; }));
+  Object.values(ganaderos).forEach(g=>{ if(g.emp!==emp)return; const f=(g.mes||'')+'-28';
+    if(enPer(f))(g.items||[]).forEach(i=>items.push({fecha:f,orden:f,concepto:i.desc,det:'Servicio ganadero · '+nombreMes(g.mes),signo:i.signo===-1?-1:1,monto:i.monto||0}));
+    else if(antes(f))antGana+=g.total||0; });
+  Object.values(ajustes).forEach(a=>{ if(a.emp!==emp)return; const sg=a.signo===-1?-1:1;
+    if(enPer(a.fecha))items.push({fecha:a.fecha,orden:a.fecha,concepto:a.concepto||'Ajuste',det:`${fechaLinda(a.fecha)}${a.obs?' · '+a.obs:''}`,signo:sg,monto:a.monto||0});
+    else if(antes(a.fecha))antGana+=(a.monto||0)*sg; });
+  const pagosPer=Object.values(pagos).filter(pp=>pp.emp===emp&&enPer(pp.fecha)).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  Object.values(pagos).forEach(pp=>{ if(pp.emp===emp&&antes(pp.fecha))antPaga+=pp.monto||0; });
+  items.sort((a,b)=>(a.orden||'').localeCompare(b.orden||''));
+  const suma=items.filter(i=>i.signo!==-1).reduce((t,i)=>t+i.monto,0);
+  const resta=items.filter(i=>i.signo===-1).reduce((t,i)=>t+i.monto,0);
+  const total=suma-resta, abonado=pagosPer.reduce((t,pp)=>t+(pp.monto||0),0);
+  const saldoAnt=per.conSaldo?antGana-antPaga:0, saldo=saldoAnt+total-abonado;
+  const filas=items.map(i=>`<tr><td>${i.concepto}${i.det?'<br><span class="det">'+i.det+'</span>':''}</td><td>${i.signo===-1?'Descuento':'Haber'}</td><td class="der ${i.signo===-1?'rojo':'verde'}">${i.signo===-1?'− ':''}${plata(i.monto)}</td></tr>`).join('');
+  const filasPagos=pagosPer.map(pp=>`<tr><td>${fechaLinda(pp.fecha)}</td><td>${pp.cat||'—'}${pp.obs?'<br><span class="det">'+pp.obs+'</span>':''}</td><td class="der rojo">${plata(pp.monto)}</td></tr>`).join('');
+  const f=new Date(); const fechaImp=fechaLinda(hoy())+' '+('0'+f.getHours()).slice(-2)+':'+('0'+f.getMinutes()).slice(-2);
+  const periodoTxt=per.esMes?per.etiqueta:`${d?fechaLinda(d):'inicio'} al ${h?fechaLinda(h):fechaLinda(hoy())}`;
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Liquidación ${per.etiqueta} — ${nombre}</title>
+  <style>
+    *{box-sizing:border-box;font-family:Georgia,'Times New Roman',serif}
+    body{margin:0;padding:32px;color:#1f261c}
+    .cab{display:flex;align-items:center;gap:14px;border-bottom:3px solid #2f5d34;padding-bottom:14px;margin-bottom:8px}
+    .cab img{height:60px}.cab h1{margin:0;font-size:26px;color:#1a2e1a}
+    .cab .sub{margin:2px 0 0;font-size:13px;color:#6b7268;font-family:Arial,sans-serif}
+    .meta{font-family:Arial,sans-serif;font-size:12px;color:#6b7268;margin-bottom:18px}.meta b{color:#1f261c}
+    .tot{display:flex;gap:12px;margin-bottom:20px}
+    .tot>div{flex:1;border:1px solid #e4e2d6;border-radius:10px;padding:12px;text-align:center}
+    .tot .et{font-family:Arial,sans-serif;font-size:11px;text-transform:uppercase;color:#6b7268;letter-spacing:.5px}
+    .tot .num{font-size:19px;font-weight:bold;margin-top:4px}
+    .verde{color:#3a8a4a}.rojo{color:#b23a3a}
+    h2{font-size:15px;margin:22px 0 8px;color:#1a2e1a}
+    table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px}
+    th{background:#2f5d34;color:#fff;text-align:left;padding:8px 10px;font-weight:bold}
+    th.der,td.der{text-align:right;white-space:nowrap}
+    td{padding:7px 10px;border-bottom:1px solid #e4e2d6;vertical-align:top}
+    .det{color:#6b7268;font-size:11px}
+    tr:nth-child(even) td{background:#faf9f4}
+    tfoot td{font-weight:bold;background:#f0f6ee!important;font-size:14px}
+    .pie{margin-top:24px;font-family:Arial,sans-serif;font-size:11px;color:#9a9a8e;text-align:center;border-top:1px solid #e4e2d6;padding-top:10px}
+    @media print{body{padding:18px}}
+  </style></head><body>
+    <div class="cab"><img src="${LOGO_PDF}"><div><h1>El Mestizo</h1><p class="sub">${per.esMes?'Liquidación mensual':'Liquidación del período'} — Servicios agrícolas</p></div></div>
+    <div class="meta">Trabajador: <b>${nombre}</b>${e.cuit?' &nbsp;·&nbsp; CUIT/CUIL: <b>'+e.cuit+'</b>':''} &nbsp;·&nbsp; Período: <b>${periodoTxt}</b> &nbsp;·&nbsp; Emitido: <b>${fechaImp}</b></div>
+    <div class="tot">
+      ${per.conSaldo?`<div><div class="et">Saldo anterior</div><div class="num ${saldoAnt<0?'rojo':''}">${plata(saldoAnt)}</div></div>`:''}
+      <div><div class="et">Total liquidado</div><div class="num verde">${plata(total)}</div></div>
+      <div><div class="et">Abonado en el ${per.esMes?'mes':'período'}</div><div class="num rojo">${plata(abonado)}</div></div>
+      <div><div class="et">Saldo</div><div class="num ${saldo<0?'rojo':''}">${plata(saldo)}</div></div>
+    </div>
+    <h2>Detalle de la liquidación</h2>
+    <table>
+      <thead><tr><th>Concepto</th><th>Tipo</th><th class="der">Importe</th></tr></thead>
+      <tbody>${filas||'<tr><td colspan=3 style="text-align:center;color:#9a9a8e;padding:20px">Sin conceptos en el período</td></tr>'}</tbody>
+      <tfoot>
+        <tr><td colspan=2>Total de haberes</td><td class="der verde">${plata(suma)}</td></tr>
+        ${resta?`<tr><td colspan=2>Total de descuentos</td><td class="der rojo">− ${plata(resta)}</td></tr>`:''}
+        <tr><td colspan=2>TOTAL A COBRAR</td><td class="der">${plata(total)}</td></tr>
+      </tfoot>
+    </table>
+    <h2>Pagos registrados ${per.esMes?'de '+per.etiqueta:'en el período'}</h2>
+    <table>
+      <thead><tr><th>Fecha</th><th>Comprobante / Detalle</th><th class="der">Importe</th></tr></thead>
+      <tbody>${filasPagos||'<tr><td colspan=3 style="text-align:center;color:#9a9a8e;padding:20px">Sin pagos registrados en este período</td></tr>'}</tbody>
+      ${filasPagos?`<tfoot><tr><td colspan=2>Total abonado</td><td class="der rojo">${plata(abonado)}</td></tr></tfoot>`:''}
+    </table>
+    ${per.conSaldo?`<h2>Resumen de cuenta</h2>
+    <table>
+      <tbody>
+        <tr><td>Saldo anterior al ${d?fechaLinda(d):'período'}<br><span class="det">Ganado ${plata(antGana)} − pagado ${plata(antPaga)}</span></td><td class="der ${saldoAnt<0?'rojo':''}">${saldoAnt<0?'− ':''}${plata(Math.abs(saldoAnt))}</td></tr>
+        <tr><td>Total liquidado en el ${per.esMes?'mes':'período'}</td><td class="der verde">+ ${plata(total)}</td></tr>
+        <tr><td>Abonado en el ${per.esMes?'mes':'período'}</td><td class="der rojo">− ${plata(abonado)}</td></tr>
+      </tbody>
+      <tfoot><tr><td>SALDO AL CIERRE</td><td class="der ${saldo<0?'rojo':''}">${plata(saldo)}</td></tr></tfoot>
+    </table>`:''}
+    <div class="pie">El Mestizo — Gestión de Trabajadores · ${fechaImp}</div>
+    <script>window.onload=function(){setTimeout(function(){window.print();},300);}<\/script>
+  </body></html>`;
+}
+
 /* PDF de la liquidación ganadera de un mes */
 function armarHTMLGan(id){
   const g=ganaderos[id]; if(!g){toast('No se encontró el servicio');return;}
@@ -3286,12 +3374,12 @@ function periodoElegido(){
   const d=$('pe-desde').value, h=$('pe-hasta').value, m=$('pe-mes').value;
   if(!d&&!h){toast('Elegí un mes o poné las fechas');return null;}
   const etiqueta=m?nombreMes(m):`${d?fechaLinda(d):'inicio'} al ${h?fechaLinda(h):fechaLinda(hoy())}`;
-  return {desde:d,hasta:h,etiqueta,conSaldo:$('pe-saldo').checked,archivo:m||((d||'inicio')+'_'+(h||hoy()))};
+  return {desde:d,hasta:h,etiqueta,esMes:!!m,conSaldo:$('pe-saldo').checked,archivo:m||((d||'inicio')+'_'+(h||hoy()))};
 }
-function imprimirPeriodo(){const per=periodoElegido(); if(!per)return; const html=armarHTMLResumen(per); if(html){cerrar('modal-periodo');abrirImpresion(html);}}
+function imprimirPeriodo(){const per=periodoElegido(); if(!per)return; const html=armarHTMLPeriodo(per); if(html){cerrar('modal-periodo');abrirImpresion(html);}}
 function compartirPeriodo(){
   const per=periodoElegido(); if(!per)return;
-  const html=armarHTMLResumen(per); if(!html)return;
+  const html=armarHTMLPeriodo(per); if(!html)return;
   const nom=empleados[empSeleccionado]?empleados[empSeleccionado].nombre:'trabajador';
   cerrar('modal-periodo');
   compartirComoPDF(html,'Liquidacion_'+archivoSeguro(nom)+'_'+per.archivo+'.pdf','Liquidación '+per.etiqueta+' — '+nom);

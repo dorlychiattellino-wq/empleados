@@ -271,6 +271,8 @@
     border:none;border-radius:50%;color:var(--tinta);cursor:pointer;display:flex;align-items:center;
     justify-content:center}
   .modal-cerrar:active{background:var(--gris);color:#fff}
+  .btn-seguir{background:#fff;color:var(--campo);border:2px solid var(--campo);padding:12px 18px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+  .btn-seguir:active{background:#eef4ee}
   .btn-cancelar{background:none;color:var(--gris);border:1.5px solid var(--gris-cl);padding:12px 18px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
 
   .vacio{text-align:center;color:var(--gris);padding:30px 10px;font-size:14px}
@@ -720,6 +722,7 @@
     <div class="campo-form"><label>Importe abonado ($)</label><input type="number" id="pago-monto" step="0.01" placeholder="0"></div>
     <div class="campo-form"><label>Observaciones</label><textarea id="pago-obs" placeholder="Opcional"></textarea></div>
     <button class="btn sec" onclick="guardarPago()">Guardar pago</button>
+    <button class="btn-seguir seguir-btn" onclick="guardarPago(true)">💾 Guardar y seguir cargando</button>
     <button class="btn-cancelar" onclick="cerrar('modal-pago')">Cancelar</button>
   </div>
 </div>
@@ -770,6 +773,7 @@
       <div id="labor-preview-body" style="margin-top:6px;font-size:14px"></div>
     </div>
     <button class="btn" onclick="guardarLabor()">Guardar labor</button>
+    <button class="btn-seguir seguir-btn" onclick="guardarLabor(true)">💾 Guardar y seguir cargando</button>
     <button class="btn-cancelar" onclick="cerrar('modal-labor')">Cancelar</button>
   </div>
 </div>
@@ -839,6 +843,7 @@
     </div>
     <div class="campo-form"><label>Observaciones</label><textarea id="lo-obs" placeholder="Ej: BOLSON 1 MAIZ"></textarea></div>
     <button class="btn" onclick="guardarLote()">Guardar</button>
+    <button class="btn-seguir seguir-btn" onclick="guardarLote(true)">💾 Guardar y seguir cargando</button>
     <button class="btn-cancelar" onclick="cerrar('modal-lote')">Cancelar</button>
   </div>
 </div>
@@ -862,6 +867,7 @@
     </div>
     <div class="campo-form"><label>Observaciones</label><input id="pr-obs" placeholder="Opcional (cliente, factura, etc.)"></div>
     <button class="btn" onclick="guardarPrecio()">Guardar</button>
+    <button class="btn-seguir seguir-btn" onclick="guardarPrecio(true)">💾 Guardar y seguir cargando</button>
     <button class="btn-cancelar" onclick="cerrar('modal-precio')">Cancelar</button>
   </div>
 </div>
@@ -1166,6 +1172,18 @@ document.addEventListener('dblclick',e=>{ // doble clic en la cabecera: volver a
   const box=head.closest('.modal'); delete posModales[box.parentElement.id]; box.style.transform='';
   try{localStorage.setItem('mestizo_posmodal',JSON.stringify(posModales));}catch(err){}
 });
+/* "Guardar y seguir": el botón solo aparece al cargar algo nuevo (no al editar) */
+let seguirCont={};
+function modoSeguir(modalId,esNuevo){
+  const b=$(modalId).querySelector('.seguir-btn'); if(b)b.style.display=esNuevo?'':'none';
+  if(esNuevo===false)seguirCont[modalId]=0;
+}
+function seguirCargando(modalId,foco){
+  seguirCont[modalId]=(seguirCont[modalId]||0)+1;
+  const box=$(modalId).querySelector('.modal'); if(box)box.scrollTop=0;
+  const t=$(modalId).querySelector('.modal-head h3'); if(t){t.innerHTML=t.textContent.replace(/\s*·\s*\d+ guardad.*$/,'')+` <span style="font-size:12px;color:var(--gris);font-weight:400">· ${seguirCont[modalId]} guardad${seguirCont[modalId]===1?'o':'os'}</span>`;}
+  if(foco){const el=$(foco); if(el)setTimeout(()=>{try{el.focus();}catch(e){}},50);}
+}
 function cerrar(id){$(id).classList.remove('abierto');document.querySelectorAll('.sugerencias').forEach(s=>s.style.display='none');}
 /* cerrar tocando el fondo oscuro o con Escape */
 document.querySelectorAll('.modal-bg').forEach(bg=>{
@@ -1236,9 +1254,10 @@ function abrirModalPago(id){
     $('pago-monto').value=p.monto;$('pago-obs').value=p.obs||'';}
   else{$('modal-pago-titulo').textContent='Nuevo pago';$('pago-fecha').value=fechaSesion.pago||hoy();
     $('pago-cat').value='';$('pago-monto').value='';$('pago-obs').value='';}
+  modoSeguir('modal-pago',!id);
   abrir('modal-pago');
 }
-function guardarPago(){
+function guardarPago(seguir){
   const emp=$('pago-emp').value, cat=$('pago-cat').value.trim();
   const monto=parseFloat($('pago-monto').value)||0;
   if(!emp){toast('Elegí un trabajador');return;}
@@ -1247,6 +1266,11 @@ function guardarPago(){
   const id=$('pago-id').value||uid();
   fechaSesion.pago=$('pago-fecha').value;
   guardar('pagos/'+id,{fecha:$('pago-fecha').value,emp,cat,monto,obs:$('pago-obs').value.trim()},'Pago guardado');
+  if(seguir&&!$('pago-id').value){
+    // se conservan fecha y trabajador; se limpia lo demás
+    $('pago-cat').value='';$('pago-monto').value='';$('pago-obs').value='';
+    seguirCargando('modal-pago','pago-emp'); return;
+  }
   cerrar('modal-pago');
 }
 function borrarPago(id){if(confirm('¿Eliminar este pago?')){borrarRegistro('pagos/'+id,'Pago eliminado');}}
@@ -1265,6 +1289,7 @@ function abrirModalLabor(id){
   renderChipsLabor();
   sugerirPreciosLabor();
   sugerirDesdeLotes();
+  modoSeguir('modal-labor',!id);
   abrir('modal-labor');
 }
 function renderChipsLabor(){
@@ -1306,7 +1331,7 @@ function previewLabor(){
   });
   body.innerHTML=html;box.style.display='block';
 }
-function guardarLabor(){
+function guardarLabor(seguir){
   const campo=titulo($('labor-campo').value), act=capitalizar($('labor-act').value.trim());
   const precio=parseFloat($('labor-precio').value)||0, has=parseFloat($('labor-has').value)||0;
   const ids=Object.keys(editLaborChips);
@@ -1324,6 +1349,12 @@ function guardarLabor(){
   const objL={fecha:$('labor-fecha').value,campo,act,cultivo:normalizarCultivo($('labor-cultivo').value),precio,has,participantes};
   if($('labor-rinde').value)objL.rinde=parseFloat($('labor-rinde').value)||0;
   guardar('labores/'+id,objL,'Labor guardada y repartida');
+  if(seguir&&!$('labor-id').value){
+    // se conservan fecha, campo y cultivo; se limpia actividad, precio, has, rinde y trabajadores
+    $('labor-act').value='';$('labor-precio').value='';$('labor-has').value='';$('labor-rinde').value='';
+    editLaborChips={}; renderChipsLabor(); sugerirPreciosLabor(); sugerirDesdeLotes();
+    seguirCargando('modal-labor','labor-act'); return;
+  }
   cerrar('modal-labor');
 }
 /* precios del historial que se parecen a la actividad, ordenados por cercanía a la fecha */
@@ -2324,6 +2355,7 @@ function abrirModalLote(id){
   $('lo-rinde').value=l&&l.rinde?l.rinde:'';
   loRindeFuente=l&&l.kg?'kg':(l&&l.rinde?'rinde':'');
   difLote(); ayudaRinde();
+  modoSeguir('modal-lote',!id);
   abrir('modal-lote');
 }
 function difLote(){
@@ -2353,7 +2385,7 @@ function rindeLote(orig){
   }
   ayudaRinde();
 }
-function guardarLote(){
+function guardarLote(seguir){
   const fecha=$('lo-fecha').value, estab=titulo($('lo-estab').value);
   if(!fecha){toast('Poné la fecha');return;}
   if(!estab){toast('Poné el establecimiento');return;}
@@ -2369,6 +2401,12 @@ function guardarLote(){
   const id=$('lo-id').value||uid();
   fechaSesion.lote=fecha;
   guardar('lotes/'+id,obj,'Labor guardada');
+  if(seguir&&!$('lo-id').value){
+    // se conservan planilla, fecha, establecimiento, labor, cultivo, estado, maquinista y datos de factura; se limpia lote, cantidades, kilos/rinde y observaciones
+    ['lo-lote','lo-cant','lo-fact','lo-kg','lo-rinde','lo-obs'].forEach(i=>$(i).value='');
+    loRindeFuente=''; difLote(); ayudaRinde();
+    seguirCargando('modal-lote','lo-lote'); return;
+  }
   cerrar('modal-lote');
 }
 function borrarLote(id){if(confirm('¿Eliminar este registro?'))borrarRegistro('lotes/'+id,'Registro eliminado');}
@@ -2568,15 +2606,22 @@ function abrirModalPrecio(id){
   $('pr-estab').value=p?p.estab||'':'';
   $('pr-obs').value=p?p.obs||'':'';
   ajustarPrecioForm();
+  modoSeguir('modal-precio',!id);
   abrir('modal-precio');
 }
-function guardarPrecio(){
+function guardarPrecio(seguir){
   const fecha=$('pr-fecha').value, importe=parseFloat($('pr-importe').value)||0;
   if(!fecha){toast('Poné la fecha');return;}
   if(!importe){toast('Poné el importe');return;}
   const obj={fecha,labor:$('pr-labor').value,importe,cultivo:normalizarCultivo($('pr-cultivo').value),estab:titulo($('pr-estab').value),obs:$('pr-obs').value.trim()};
   if(esCosecha(obj.labor)&&$('pr-rinde').value)obj.rinde=parseFloat($('pr-rinde').value)||0;
   guardar('preciosLab/'+($('pr-id').value||uid()),obj,'Precio guardado');
+  if(seguir&&!$('pr-id').value){
+    // se conservan fecha, cultivo y establecimiento; se limpia importe, rinde y observaciones, y pasa a la labor siguiente
+    $('pr-importe').value='';$('pr-rinde').value='';$('pr-obs').value='';
+    const sel=$('pr-labor'); if(sel.selectedIndex<sel.options.length-1)sel.selectedIndex++; ajustarPrecioForm();
+    seguirCargando('modal-precio','pr-importe'); return;
+  }
   cerrar('modal-precio');
 }
 function borrarPrecio(id){if(confirm('¿Eliminar este precio?'))borrarRegistro('preciosLab/'+id,'Precio eliminado');}

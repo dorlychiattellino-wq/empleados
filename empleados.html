@@ -974,6 +974,15 @@
     </div>
     <div class="campo-form"><label>Labores a incluir</label>
       <select id="cl-que" onchange="renderPreciosCliente()"><option value="sf">Solo sin facturar</option><option value="todas">Todas (facturadas y sin facturar)</option><option value="fact">Solo facturadas</option></select></div>
+    <div class="tarjeta" style="padding:10px 14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <b style="font-size:14px">Labores que van al PDF <span id="cl-regs-cont" class="sub" style="font-weight:400"></span></b>
+        <span><button class="btn peq linea" style="width:auto;padding:5px 10px;margin:0" onclick="clExcluidos={};renderPreciosCliente()">Todas</button>
+        <button class="btn peq gris" style="width:auto;padding:5px 10px;margin:0 0 0 4px" onclick="clTildarNinguna()">Ninguna</button></span>
+      </div>
+      <div class="sub" style="font-size:12px;margin-bottom:6px">Destildá las que no querés que aparezcan.</div>
+      <div id="cl-regs-lista" style="max-height:260px;overflow:auto"></div>
+    </div>
     <div class="tarjeta" style="padding:10px 14px">
       <label style="display:flex;gap:10px;align-items:center;font-size:14px;margin-bottom:8px"><input type="checkbox" id="cl-precios" class="fa-check" checked onchange="renderPreciosCliente()"> Incluir precio por labor e importes</label>
       <div id="cl-precios-box" style="margin:4px 0 10px 28px">
@@ -2847,16 +2856,32 @@ function calcularPrecios(){
 
 /* =================== RESUMEN PARA CLIENTE (PDF) =================== */
 const EMPRESA={nombre:'El Mestizo',titular:'Osvaldo Gustavo Solsona',cuit:'20-22954901-5',iva:'Responsable Inscripto',tel:'+54 9 2655 64-6045',mail:'solsonagustavo@gmail.com',rubro:'Servicios agrícolas'};
-let clPrecios={};
+let clPrecios={}, clExcluidos={};
+function clTildarNinguna(){ datosCliente(true).regs.forEach(l=>clExcluidos[l._id]=true); renderPreciosCliente(); }
+function clToggle(id,on){ if(on)delete clExcluidos[id]; else clExcluidos[id]=true; renderPreciosCliente(); }
+function renderRegsCliente(){
+  const lista=$('cl-regs-lista'), cont=$('cl-regs-cont'); if(!lista)return;
+  const todos=datosCliente(true).regs; const multi=!$('cl-estab').value;
+  const activos=todos.filter(l=>!clExcluidos[l._id]).length;
+  cont.textContent=todos.length?`· ${activos} de ${todos.length}`:'';
+  if(!todos.length){lista.innerHTML='<div class="sub">No hay labores con esos filtros.</div>';return;}
+  lista.innerHTML=todos.map(l=>{
+    const on=!clExcluidos[l._id], u=unidadLabor(l.labor), cant=l.fact!=null?l.fact:(l.cant||0);
+    return `<label class="pp-reg${on?'':' '}" style="padding:4px 0;border-bottom:1px dashed var(--gris-cl);font-size:12.5px;color:${on?'var(--tinta)':'var(--gris)'};${on?'':'text-decoration:line-through;opacity:.7'}">
+      <input type="checkbox" ${on?'checked':''} onchange="clToggle('${l._id}',this.checked)">
+      <span style="flex:1">📅 ${fechaLinda(l.fecha)}${multi?' · '+(l.estab||'—'):''}${l.lote?' · L.'+l.lote:''} · <b>${l.labor}</b>${l.cultivo?' 🌱 '+l.cultivo:''} · ${num2(cant)} ${u}${(l.estado||'S/F')==='FACT'?' · <span style="color:var(--verde-ok);font-weight:700">FACT</span>':''}</span>
+    </label>`;}).join('');
+}
 function abrirModalCliente(){
   $('cl-planilla').value=ltPlanilla!=='__todas__'?ltPlanilla:'GENERAL';
   llenarEstabsCliente();
   const fe=$('lf-estab').value; if(fe)$('cl-estab').value=fe;
   $('cl-desde').value=$('lf-desde').value||''; $('cl-hasta').value=$('lf-hasta').value||'';
-  clPrecios={}; renderPreciosCliente();
+  clPrecios={}; clExcluidos={}; renderPreciosCliente();
   abrir('modal-cliente');
 }
 function renderPreciosCliente(){
+  renderRegsCliente();
   const box=$('cl-precios-box'), lista=$('cl-precios-lista'); if(!box)return;
   box.style.display=$('cl-precios').checked?'block':'none';
   if(!$('cl-precios').checked)return;
@@ -2890,10 +2915,10 @@ function precioLaborAl(labor,hasta,cultivo){
   return r||arr[arr.length-1];
 }
 function claveLC(l){return l.labor+(l.cultivo?' · '+l.cultivo:'');}
-function datosCliente(){
+function datosCliente(incluirExcluidos){
   const pl=$('cl-planilla').value, es=$('cl-estab').value, d=$('cl-desde').value, h=$('cl-hasta').value, que=$('cl-que').value;
   const conPrecios=$('cl-precios').checked, conPagos=$('cl-pagos').checked, conObs=$('cl-obs').checked, nota=$('cl-nota').value.trim();
-  const regs=Object.values(lotes).filter(l=>l.planilla===pl&&(!es||l.estab===es)&&entreFechas(l.fecha,d,h)&&(que==='todas'||(que==='sf'?(l.estado||'S/F')==='S/F':(l.estado||'S/F')==='FACT')))
+  const regs=Object.entries(lotes).map(([id,l])=>Object.assign({_id:id},l)).filter(l=>l.planilla===pl&&(!es||l.estab===es)&&entreFechas(l.fecha,d,h)&&(que==='todas'||(que==='sf'?(l.estado||'S/F')==='S/F':(l.estado||'S/F')==='FACT'))&&(incluirExcluidos||!clExcluidos[l._id]))
     .sort((a,b)=>(a.estab||'').localeCompare(b.estab||'')||(a.fecha||'').localeCompare(b.fecha||''));
   const cob=Object.values(cobros).filter(c=>c.planilla===pl&&(!es||c.estab===es)&&entreFechas(c.fecha,d,h)).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   const cliente=es||(pl==='BERNARDO'?'BERNARDO':pl);
@@ -2901,7 +2926,7 @@ function datosCliente(){
 }
 function armarHTMLCliente(){
   const o=datosCliente();
-  if(!o.regs.length&&!o.cob.length){toast('No hay labores ni pagos para ese cliente con esos filtros');return null;}
+  if(!o.regs.length&&!o.cob.length){toast('No hay labores ni pagos para ese cliente con esos filtros (revisá las labores tildadas)');return null;}
   if(o.conPrecios){
     const faltan=[...new Set(o.regs.map(claveLC))].filter(k=>!(parseFloat(clPrecios[k])>0));
     if(faltan.length&&!confirm(`Estas labores no tienen precio cargado y saldrán sin importe:\n• ${faltan.join('\n• ')}\n\n¿Generar igual?`))return null;

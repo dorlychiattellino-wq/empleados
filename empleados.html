@@ -344,7 +344,7 @@
       <div class="conexion offline" id="conexion">
         <span class="punto"></span><span id="conexion-txt">Sin conexión</span>
       </div>
-      <span id="app-version" style="font-size:10px;color:rgba(255,255,255,.55);margin-left:8px;align-self:center;white-space:nowrap">v08/10 12:45</span>
+      <span id="app-version" style="font-size:10px;color:rgba(255,255,255,.55);margin-left:8px;align-self:center;white-space:nowrap">v08/10 12:55</span>
     </div>
   </header>
 
@@ -2864,6 +2864,14 @@ function calcularPrecios(){
 const EMPRESA={nombre:'El Mestizo',titular:'Osvaldo Gustavo Solsona',cuit:'20-22954901-5',iva:'Responsable Inscripto',tel:'+54 9 2655 64-6045',mail:'solsonagustavo@gmail.com',rubro:'Servicios agrícolas'};
 let clPrecios={}, clExcluidos={};
 function clTildarNinguna(){ datosCliente(true).regs.forEach(l=>clExcluidos[l._id]=true); renderPreciosCliente(); }
+function clSetRinde(id,v,campo){
+  const l=lotes[id]; if(!l)return;
+  const n=parseFloat(v)||0, has=unidadLabor(l.labor)==='ha'?(l.cant||0):0, up={};
+  if(campo==='kg'){ l.kg=n||null; up['lotes/'+id+'/kg']=n||null; if(n&&has){l.rinde=Math.round(n/1000/has*100)/100; up['lotes/'+id+'/rinde']=l.rinde;} }
+  else { l.rinde=n||null; up['lotes/'+id+'/rinde']=n||null; if(n&&has){l.kg=Math.round(n*1000*has); up['lotes/'+id+'/kg']=l.kg;} }
+  guardarVarios(up,'Rinde guardado en el registro');
+  renderPreciosCliente();
+}
 function clToggle(id,on){ if(on)delete clExcluidos[id]; else clExcluidos[id]=true; renderPreciosCliente(); }
 function renderRegsCliente(){
   const lista=$('cl-regs-lista'), cont=$('cl-regs-cont'); if(!lista)return;
@@ -2875,7 +2883,8 @@ function renderRegsCliente(){
     const on=!clExcluidos[l._id], u=unidadLabor(l.labor), cant=l.fact!=null?l.fact:(l.cant||0);
     return `<label class="pp-reg${on?'':' '}" style="padding:4px 0;border-bottom:1px dashed var(--gris-cl);font-size:12.5px;color:${on?'var(--tinta)':'var(--gris)'};${on?'':'text-decoration:line-through;opacity:.7'}">
       <input type="checkbox" ${on?'checked':''} onchange="clToggle('${l._id}',this.checked)">
-      <span style="flex:1">📅 ${fechaLinda(l.fecha)}${multi?' · '+(l.estab||'—'):''}${l.lote?' · L.'+l.lote:''} · <b>${l.labor}</b>${l.cultivo?' 🌱 '+l.cultivo:''}${l.rinde?' · rinde '+num2(l.rinde)+' tn/ha':''} · ${num2(cant)} ${u}${(l.estado||'S/F')==='FACT'?' · <span style="color:var(--verde-ok);font-weight:700">FACT</span>':''}</span>
+      <span style="flex:1">📅 ${fechaLinda(l.fecha)}${multi?' · '+(l.estab||'—'):''}${l.lote?' · L.'+l.lote:''} · <b>${l.labor}</b>${l.cultivo?' 🌱 '+l.cultivo:''} · ${num2(cant)} ${u}${(l.estado||'S/F')==='FACT'?' · <span style="color:var(--verde-ok);font-weight:700">FACT</span>':''}</span>
+      ${esCosecha(l.labor)?`<span style="display:flex;align-items:center;gap:4px;white-space:nowrap" onclick="event.stopPropagation()"><span style="font-size:11px;color:var(--tierra);font-weight:700">🌽</span><input type="number" step="0.01" class="fa-inp" style="width:64px;padding:3px 6px;font-size:12px" value="${l.rinde||''}" placeholder="rinde" title="Rinde en tn/ha (se guarda en el registro)" onchange="clSetRinde('${l._id}',this.value,'rinde')"><span style="font-size:10.5px;color:var(--gris)">tn/ha</span><input type="number" step="1" class="fa-inp" style="width:78px;padding:3px 6px;font-size:12px" value="${l.kg||''}" placeholder="kg" title="Kilos cosechados (se guarda en el registro)" onchange="clSetRinde('${l._id}',this.value,'kg')"><span style="font-size:10.5px;color:var(--gris)">kg</span></span>`:''}
     </label>`;}).join('');
 }
 function abrirModalCliente(){
@@ -2903,7 +2912,7 @@ function renderPreciosCliente(){
     if(clPrecios[k]===undefined)clPrecios[k]=s?s.importe:'';
     const kk=k.replace(/'/g,"\\'");
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;border-bottom:1px dashed var(--gris-cl);padding-bottom:5px">
-      <span style="flex:1 1 150px;font-size:13.5px"><b>${g.labor}</b>${g.cultivo?` <span style="color:var(--campo);font-weight:700">🌱 ${g.cultivo}</span>`:''}${g.rinde?` <span style="color:var(--tierra);font-weight:700">🌽 Rinde ${num2(g.rinde)} tn/ha</span>`:''}
+      <span style="flex:1 1 150px;font-size:13.5px"><b>${g.labor}</b>${g.cultivo?` <span style="color:var(--campo);font-weight:700">🌱 ${g.cultivo}</span>`:''}${g.rinde?` <span style="color:var(--tierra);font-weight:700">🌽 Rinde ${num2(g.rinde)} tn/ha</span>`:(esCosecha(g.labor)?` <span style="color:var(--rojo);font-size:11.5px;font-weight:700">⚠ sin rinde cargado — ponelo en la lista de labores de arriba</span>`:'')}
         <span class="chico" style="display:block;font-size:11px;color:var(--gris)">${g.n} registro(s) · ${num2(g.cant)} ${u} · ${s?'sugerido '+plata(s.importe)+'/'+u+' ('+fechaLinda(s.fecha)+(s.cultivo&&s.cultivo!==g.cultivo?', '+s.cultivo:'')+(s.rinde?', rinde '+num2(s.rinde)+' tn/ha':'')+(s.estab?', '+s.estab:'')+')':'sin precio cargado'}</span></span>
       <span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
         <span style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:var(--gris)">$ por ${u}</span>

@@ -344,7 +344,7 @@
       <div class="conexion offline" id="conexion">
         <span class="punto"></span><span id="conexion-txt">Sin conexión</span>
       </div>
-      <span id="app-version" style="font-size:10px;color:rgba(255,255,255,.55);margin-left:8px;align-self:center;white-space:nowrap">v08/10 12:55</span>
+      <span id="app-version" style="font-size:10px;color:rgba(255,255,255,.55);margin-left:8px;align-self:center;white-space:nowrap">v31/10 22:20</span>
     </div>
   </header>
 
@@ -1061,7 +1061,8 @@ let editItems=[];
 const $=id=>document.getElementById(id);
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('ver');setTimeout(()=>t.classList.remove('ver'),2200);}
 function plata(n){n=Number(n)||0;return '$'+n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2});}
-function hoy(){return new Date().toISOString().slice(0,10);}
+function fechaLocalISO(d){d=d||new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function hoy(){return fechaLocalISO();} // fecha local (Argentina), no UTC
 function fechaLinda(f){if(!f)return'';const[a,m,d]=f.split('-');return `${d}/${m}/${a}`;}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 
@@ -1422,7 +1423,7 @@ function borrarLabor(id){if(confirm('¿Eliminar esta labor?')){borrarRegistro('l
 /* =================== SERVICIO GANADERO =================== */
 const ITEMS_GAN_BASE=['Servicio','Alquiler','Mercadería','Bonificación anual','Aguinaldo','Adelanto','Descuento'];
 
-function mesActual(){return new Date().toISOString().slice(0,7);}
+function mesActual(){return fechaLocalISO().slice(0,7);}
 
 function abrirModalGan(id){
   $('gan-id').value=id||'';

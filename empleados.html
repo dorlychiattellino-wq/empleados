@@ -344,7 +344,7 @@
       <div class="conexion offline" id="conexion">
         <span class="punto"></span><span id="conexion-txt">Sin conexión</span>
       </div>
-      <span id="app-version" style="font-size:10px;color:rgba(255,255,255,.55);margin-left:8px;align-self:center;white-space:nowrap">v31/10 22:20</span>
+      <span id="app-version" style="font-size:10px;color:rgba(255,255,255,.55);margin-left:8px;align-self:center;white-space:nowrap">v20/11 18:45</span>
     </div>
   </header>
 
@@ -2633,9 +2633,9 @@ function guardarPrecio(seguir){
   if(esCosecha(obj.labor)&&$('pr-rinde').value)obj.rinde=parseFloat($('pr-rinde').value)||0;
   guardar('preciosLab/'+($('pr-id').value||uid()),obj,'Precio guardado');
   if(seguir&&!$('pr-id').value){
-    // se conservan fecha, cultivo y establecimiento; se limpia importe, rinde y observaciones, y pasa a la labor siguiente
+    // se conservan fecha, labor, cultivo y establecimiento; se limpia importe, rinde y observaciones
     $('pr-importe').value='';$('pr-rinde').value='';$('pr-obs').value='';
-    const sel=$('pr-labor'); if(sel.selectedIndex<sel.options.length-1)sel.selectedIndex++; ajustarPrecioForm();
+    ajustarPrecioForm();
     seguirCargando('modal-precio','pr-importe'); return;
   }
   cerrar('modal-precio');
